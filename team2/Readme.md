@@ -1,1 +1,1 @@
-Team2
+Team2: Hanna, Srividhya, Jannica
