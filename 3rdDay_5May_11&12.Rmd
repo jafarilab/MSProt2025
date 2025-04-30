@@ -10,7 +10,6 @@ output: html_document
 Visit `gosocrative.com` and enter room name `FIN2025`
 
 ## Library
-
 ```{r}
 library(rpx)
 library(msdata)
