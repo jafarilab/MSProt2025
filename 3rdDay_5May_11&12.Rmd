@@ -1,5 +1,5 @@
 ---
-title: "Introduction to QFeatures object"
+title: "Introduction to PSM and QFeatures object"
 author: "Mohieddin Jafari"
 date: "`r format(Sys.time(), '%Y-%m-%d %H:%M:%S')`"
 output: html_document
@@ -32,6 +32,8 @@ library(factoextra)
 ## Preprocessing
 
 ```{r, eval=FALSE}
+table(id$spectrumID)
+table(table(id$spectrumID))
 table(id$spectrumID == "controllerType=0 controllerNumber=1 scan=1774")
 (i <- which(id$spectrumID == "controllerType=0 controllerNumber=1 scan=1774"))
 
@@ -43,10 +45,6 @@ id[i, ] |>
 (id2 <- reducePSMs(id, id$spectrumID))
 
 table(table(id2$spectrumID))
- 
-(j <- which(id2$spectrumID == "controllerType=0 controllerNumber=1 scan=1774"))
-
-id2[j, "DatabaseAccess"]
 
 ```
 
@@ -91,53 +89,11 @@ idf <- id |>
     filterPsmRank()
 idf
 ```
-
-## PSMatch vignette: Understanding protein groups with adjacency matrices
-
-```{r, eval=FALSE}
-data.frame(idf[1:10, c("sequence", "DatabaseAccess")])
-
-data.frame(idf) |>
-    as_tibble() |>
-    filter(DatabaseAccess == 'ECA2006')
-
-data.frame(idf) |>
-    as_tibble() |>
-    filter(sequence == 'RQCRTDFLNYLR')
-```
-
-```{r, eval=FALSE}
-# A systematic way of answering this question
-adj <- makeAdjacencyMatrix(idf)
-dim(adj)
-adj[1:15, 1:5]
-
-describePeptides(idf)
-
-describeProteins(idf)
-
-# All cases of matching
-(cc <- ConnectedComponents(adj))
-
-connectedComponents(cc, 1)
-connectedComponents(cc, 527)
-connectedComponents(cc, 38)
-connectedComponents(cc, 920)
-
-i <- which(nrows(cc) > 2 & ncols(cc) > 2)
-dims(cc)[i, ]
-
-cx <- connectedComponents(cc, 1082)
-plotAdjacencyMatrix(cx)
-
-## A terrible mistake: To forgot proteinGroup contains multiple proteins not only a leading protein. We should consider all protein identified in a group of protein.
-```
-
 ### Quiz 2 (GA_7)
 
 Visit `gosocrative.com` and enter room name `FIN2025`
 
-## Combining raw data with ID results
+## Combining spectral data with ID results
 
 ```{r, eval=FALSE}
 sp <- Spectra(f)
@@ -168,7 +124,7 @@ spid <- joinSpectraData(sp, idf,
 spectraVariables(spid)
 
 # Consider we match peptide sequence for MS2 scans
-all(is.na(filterMsLevel(spid, 1L)$sequence)) # No sequence for MS1 level
+all(is.na(filterMsLevel(spid, 1L)$sequence)) # No sequence match for MS1 level
 table(is.na(filterMsLevel(spid, 2L)$sequence)) # Some of MS2 level can match to a sequence
 ```
 
@@ -177,7 +133,7 @@ table(is.na(filterMsLevel(spid, 2L)$sequence)) # Some of MS2 level can match to 
 ```{r, eval=FALSE}
 plotSpectra(spid[1234])
 
-# This is an exceptional spectra with high score and well annotated when you consider b and y ions
+# What is the exceptional spectra with high score and well annotated when you consider b and y ions
 i <- which(spid$MS.GF.RawScore > 100)[1]
 plotSpectra(spid[i])
 

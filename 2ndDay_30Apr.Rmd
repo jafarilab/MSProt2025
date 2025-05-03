@@ -1,6 +1,6 @@
 ---
 title: "Introduction to Spectra object"
-author: "Mohieddin Jafari"
+author: "Mohieddin Ja = ari"
 date: "`r format(Sys.time(), '%Y-%m-%d %H:%M:%S')`"
 output: html_document
 ---
