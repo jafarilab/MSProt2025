@@ -321,12 +321,6 @@ cleavageRanges(rTinyPro, "trypsin", missedCleavages = 1)
 
 
 ```{r, eval=FALSE}
-as.data.frame(id) |>
-    as_tibble() |>
-    group_by(isDecoy) |>
-    summarise(ms = mean(MS.GF.RawScore))
-
-
 ## Ex2- Compare the distribution of raw identification scores of the decoy and non-decoy hits. Interpret the figure.
 
 # it is not a good separation between these two dataset in this example.
