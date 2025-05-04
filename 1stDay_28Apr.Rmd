@@ -48,7 +48,7 @@ knitr::opts_chunk$set(echo = FALSE)
 *TIC (total ion chromatogram) plot*: The intensities of all ions in each mass spectrometer scan (within a given time period) are summed and plotted as a function of time.
 *Base peak chromatogram plot*: The intensity of the base peak (the most intense ion in each mass spectrum) is plotted as a function of time. (Note: do not confuse the base peak with the baseline, which represents the constant signal from the background level of the instrument.)
 *XIC or EIC plot*: The intensity of a specific analyte at a chosen m/z value (either total or base peak intensity) is isolated and plotted as a function of time.
-![Alt text for the image](TIC_XIC.png)
+![](TIC_XIC.png)
 
 ## Getting data
 Get to know the ProteomeXchange Consortium: Established to create globally coordinated, standardized pipelines for data submission and dissemination across major proteomics repositories, the Consortium promotes open data policies in proteomics.

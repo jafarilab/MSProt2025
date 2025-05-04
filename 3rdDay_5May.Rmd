@@ -208,7 +208,7 @@ All quantification in Omics technology is relative quantitative not absolute.
 -   Counting: How many PSM for each protein
 -   XIC (Extracted Ion Chromatogram): Intensity of each specific peptide (m/z, precursor) over time (e.g., MaxQuant, XCMS)
 -   Labelled TMT benefit: Good to remove technical variability since it would be shared
-![Alt text for the image](TMT.png)
+![TMT](TMT.png)
 
 ### Quantitative assay
 
@@ -219,7 +219,7 @@ What we need to quantify? (First level)
 -   samples/columns annotation (meta-data)
 -   features/rows annotation (meta-data)
 
-![Alt text for the image](SE.png)
+![](SE.png)
 
 SummarizedExperiment object
 
@@ -228,7 +228,7 @@ SummarizedExperiment object
 -   features/rows annotation: rowData() Multiple SummarizedExperiment (PSM, peptides, proteins, ...) are combined into a QFeatures object.
 
 Second level is aggregating low-level QF into higher level data. We can start with QF file and after quantification, you find an interesting protein and you see only one peptide was used to identify that protein and then only one PSM was related to that peptide, then checking the quality of that PSM would be important.
-![Alt text for the image](featuresplot-1.png)
+![Aggregation](featuresplot-1.png)
 ```{r, eval=FALSE}
 data(feat1)
 feat1
@@ -329,7 +329,7 @@ read.delim(f) |>
    
 names(read.delim(f))
 i <- 56:61
-i <- grep("Intensity\\.", names(read.delim(f)))
+#i <- grep("Intensity\\.", names(read.delim(f)))
 
 (cptac_se <- readSummarizedExperiment(f,
                                      ecol = i,

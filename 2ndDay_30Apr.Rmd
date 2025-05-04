@@ -256,7 +256,7 @@ pk <- mzR::peaks(x) ## like peaksData from Spectra
 Spectra(DataFrame(hd))
 ```
 
-![Alt text for the image](frag.png)
+![](frag.png)
 ```{r}
 calculateFragments("THSQEEMQHMQR")
 ```
