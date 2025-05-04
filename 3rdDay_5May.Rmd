@@ -359,8 +359,8 @@ rowData(cptac_se) <- rowData(cptac_se)[, keep_vars]
 assay(cptac_se)
 anyNA(assay(cptac_se))
 
-## Advise to use NA instead of Zero values since we are not sure the zero values are a random observation or not (MAR or MNAR, missing at random or not at random)
-## MAR: less abundant peptide with co-eluting ions, not ionized peptides, not get identified well.
+## It is impossible to not have missing value in MS data. Many software by default uses zero instead of NA. There is an advise to use NA instead of zero values since we are not sure the zero values are a random observation or not (MAR or MNAR, missing at random or not at random). Although after imputation, we will again have many zeros but this time we do not lost all information.
+## MAR: multiple reasons such as Never been selected some precursor ions in DDA, less abundant peptide with co-eluting high abundant ions, not ionized peptides, not get identified well (false negative).
 
 cptac_se <- zeroIsNA(cptac_se)
 assay(cptac_se)
@@ -374,6 +374,7 @@ barplot(nNA(cptac_se)$nNAcols$nNA)
 
 ```{r, eval=FALSE}
 table(nNA(cptac_se)$nNArows$nNA)
+# Remember we ignore other files for simplicity of code and the number of NAs could be related to those file.
 cptac_se <- filterNA(cptac_se, pNA = 4/6)
 
 table(nNA(cptac_se)$nNArows$nNA)
@@ -383,11 +384,13 @@ nNA(cptac_se)
 ### Imputation
 
 ```{r, eval=FALSE}
+## Some imputation method good for MAR and some good for MNAR
+
 se1 <- impute(cptac_se, method = "knn")
 assay(se1)
-## Some imputation method good for MAR and some good for MNAR
+
 ## Imputation with method "MinDet"
-se2 <- impute(cptac_se, method = "MinDet")
+se2 <- impute(cptac_se, method = "MinDet") # impute with the smallest value in each column
 
 ## Imputation with method "zero"
 se3 <- impute(cptac_se, method = "zero")
@@ -402,25 +405,14 @@ plot(density(na.omit(log2(assay(se3)+1))), title = "zero")
 ## Try to understand what is the effect of imputation on the histogram of data, it should be as less as possible.
 ```
 
-```{r, echo=FALSE, eval=FALSE, include=FALSE}
-rowData(cptac_se) %>%
-    as_tibble() %>%
-    ggplot(aes(x = Score, colour = Reverse)) +
-    geom_density()
-
-
-rowData(cptac_se) %>%
-    as_tibble() %>%
-    ggplot(aes(x = PEP, colour = Reverse)) +
-    geom_density()
-```
-
 ### Filtering, transformation and normalization
 
 ```{r, eval=FALSE}
 ## connected components -> also with an SE
 cptac <- QFeatures(list(peptides = cptac_se))
 colData(cptac) <- colData(cptac[[1]])
+
+cptac
 
 ## Using the `filterFeatures()` function, filter out the reverse and contaminant hits, and also retain those that have a posterior error probability smaller than 0.05.
 table(rowData(cptac_se)$Reverse)
@@ -456,8 +448,9 @@ limma::plotDensities(assay(cptac[["peptides"]]))
 limma::plotDensities(assay(cptac[["log_peptides"]]))
 limma::plotDensities(assay(cptac[["lognorm_peptides"]]))
 ```
+
 ```{r, eval=FALSE}
-# Highlight the variability at the peptide level, effect of noise and imputation missing values (Very interesting plot)
+# Using QFeature: Highlight the variability at the peptide level, effect of noise and imputation missing values (Very interesting plot)
 cptac["P02787ups|TRFE_HUMAN_UPS", ,
       c("lognorm_peptides", "proteins")] |>
     longFormat() |>
