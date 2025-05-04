@@ -89,10 +89,6 @@ idf <- id |>
     filterPsmRank()
 idf
 ```
-### Quiz 2 (GA_7)
-
-Visit `gosocrative.com` and enter room name `FIN2025`
-
 ## Combining spectral data with ID results
 
 ```{r, eval=FALSE}
@@ -149,7 +145,11 @@ plotSpectra(spid[i], labels = addFragments,
             labelPos = 3)
 ```
 
--   Non-identified peaks in fragment spectra -- Background noise, low intensity -- High intensity in the left part of the spectra might relate to TMT molecules -- High intensity of un-fragmented precursor ion -- etc.
+-   Non-identified peaks in fragment spectra 
+-- Background noise, low intensity 
+-- High intensity in the left part of the spectra might relate to TMT molecules 
+-- High intensity of un-fragmented precursor ion 
+-- etc.
 
 ```{r, eval=FALSE}
 ## to check what is the effect of filtering intensity on b and y ion that we may miss
@@ -186,31 +186,9 @@ spid |>
                size = 4) +
     labs(colour = "Number of ids")
 ```
+### Quiz 2 (GA_7)
 
-## Comparing spectra - distances
-
-```{r, eval=FALSE}
-## Ex4- Create a new Spectra object containing the MS2 spectra with sequences "SQILQQAGTSVLSQANQVPQTVLSLLR" and "TKGLNVMQNLLTAHPDVQAVFAQNDEMALGALR".
-k <- which(spid$sequence %in% c("SQILQQAGTSVLSQANQVPQTVLSLLR", "TKGLNVMQNLLTAHPDVQAVFAQNDEMALGALR"))
-(spk <- spid[k])
-spk$sequence
-plotSpectra(spk)
-```
-
-```{r, eval=FALSE}
-## Introduction to basis of spectral library searching vs. database searching
-## Ex5- Calculate the 5 by 5 similarity matrix between all spectra using compareSpectra(). See the ?Spectra man page for details. Draw a heatmap of that matrix, for example pheatmap::pheatmap()
-mat <- compareSpectra(spk)
-colnames(mat) <- rownames(mat) <- strtrim(spk$sequence, 2)
-mat
-
-# library(pheatmap)
-pheatmap(mat)
-plotSpectraMirror(spk[1], spk[2])
-plotSpectraOverlay(spk[3:5],
-                   col = c("red", "steelblue", "green"))
-plotSpectraMirror(spk[3], spk[4])
-```
+Visit `gosocrative.com` and enter room name `FIN2025`
 
 ## Quantitative proteomics
 
@@ -224,26 +202,6 @@ All quantification in Omics technology is relative quantitative not absolute.
 -   Counting: How many PSM for each protein
 -   XIC (Extracted Ion Chromatogram): Intensity of each specific peptide (m/z, precursor) over time
 -   Labelled TMT benefit: Good to remove technical variability since it would be shared
-
-```{r, eval=FALSE}
-#PD is not trustable in statistical analysis, i.e., normalization, handling missing values and computing p-values are weird.
-## https://lazear.github.io/sage/
-## https://uclouvain-cbio.github.io/sager/
-
-# library(tidyverse)
-# library(msdata)
-# library(QFeatures)
-# if (!require("BiocManager", quietly = TRUE))
-#     install.packages("BiocManager")
-# 
-# BiocManager::install("UCLouvain-CBIO/sager")
-# if (!require("BiocManager", quietly = TRUE))
-#     install.packages("BiocManager")
-# 
-# BiocManager::install("SummarizedExperiment")
-# library(sager)
-# library(SummarizedExperiment)
-```
 
 ### Quantitative assay
 
