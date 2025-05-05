@@ -266,8 +266,9 @@ Visit `gosocrative.com` and enter room name `FIN2025`
 
 ## Working with msdata and an examplary mzID file
 ```{r, eval=FALSE}
-#library(PSMatch)
-#library(msdata)
+library(PSMatch)
+library(msdata)
+
 ident()
 idf <- ident(full.names = TRUE)
 basename(idf)
