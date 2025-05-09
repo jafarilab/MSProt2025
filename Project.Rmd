@@ -60,7 +60,7 @@ install.packages("tidyverse")
 
 # Import the data
 ```{r}
-#Data assessment
+# Data assessment
 library("rpx")
 px <- PXDataset("PXD053636")
 f <- pxget(px, grep("mzid", pxfiles(px)))
@@ -70,3 +70,19 @@ pxfiles(px)
 f
 ml
 ```
+
+# PSM Object Creation & Preprocessing
+```{r}
+# PSM Object Creation & Preprocessing
+library(Spectra)
+
+sp <- Spectra(ml)
+
+pd <- peaksData(sp)
+
+library(PSMatch)
+library(msdata)
+id <- PSM(pd)
+```
+
+
