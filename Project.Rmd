@@ -64,6 +64,9 @@ install.packages("tidyverse")
 library("rpx")
 px <- PXDataset("PXD053636")
 f <- pxget(px, grep("mzid", pxfiles(px)))
+ml <- pxget(px, grep("mzML", pxfiles(px)))
 px
 pxfiles(px)
+f
+ml
 ```
