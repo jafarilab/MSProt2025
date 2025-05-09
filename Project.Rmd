@@ -1,0 +1,69 @@
+---
+title: "Team_5_rmd"
+output: html_document
+date: "2025-05-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# Libraries 1
+
+```{r setup, include=TRUE, echo=TRUE, eval=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+install.package("BiocManager")
+library(BiocManager)
+
+##Bioconductor packages
+if (!requireNamespace("BiocManager", quietly = TRUE))
+     install.packages("BiocManager")
+ 
+BiocManager::install("tidyverse")
+BiocManager::install("factoextra")
+BiocManager::install("msdata")
+BiocManager::install("mzR")
+BiocManager::install("rhdf5")
+BiocManager::install("rpx")
+BiocManager::install("MsCoreUtils")
+BiocManager::install("QFeatures")
+BiocManager::install("Spectra")
+BiocManager::install("ProtGenerics")
+BiocManager::install("PSMatch")
+BiocManager::install("pheatmap")
+BiocManager::install("limma")
+BiocManager::install("MSnID")
+BiocManager::install("RforMassSpectrometry/SpectraVis")
+ 
+install.packages("tidyverse")
+```
+
+# Import the data
+```{r}
+#Data assessment
+library("rpx")
+px <- PXDataset("PXD053636")
+f <- pxget(px, grep("mzid", pxfiles(px)))
+px
+pxfiles(px)
+```
