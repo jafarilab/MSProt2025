@@ -63,8 +63,8 @@ install.packages("tidyverse")
 # Data assessment
 library("rpx")
 px <- PXDataset("PXD053636")
-f <- pxget(px, grep("mzid", pxfiles(px)))
-ml <- pxget(px, grep("mzML", pxfiles(px)))
+f <- pxget(px, grep("mzid", pxfiles(px))) #mzID files only
+ml <- pxget(px, grep("mzML", pxfiles(px))) #mzML files only
 px
 pxfiles(px)
 f
