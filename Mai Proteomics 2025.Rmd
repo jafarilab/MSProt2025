@@ -1,0 +1,91 @@
+---
+title: "Mai Proteomics2025"
+author: "Mai"
+date: "2025-05-11"
+output: html_document
+---
+
+#We are using csv, so some of the script provided in the course would not work as it is for mzID. But there is nothing chatGPT can't help with. Just be aware of this differnce.
+
+```{r}
+library("rpx")
+px <- PXDataset("PXD061542")
+pxget(px, grep("mzID", pxfiles(px)) #no mzID in this database
+pxget(px, grep("mzML", pxfiles(px))
+
+# Load libraries
+
+library(tidyverse)
+
+# TASK 1 — Load CSV files into 'psm' (like creating a PSM object) #we here need to load reader for the csv files
+
+library(readr)
+library(dplyr)
+
+# Load all .csv files using read_csv (not read.csv) #here because we have 10 csv files, so it is easier if we just combine them together. please change the path to where you save it.
+files <- list.files("C:/Users/maios/Documents/OUTPUT", pattern = "\\.csv$", full.names = TRUE)
+
+# Read and standardize #here i am just making the psm list from the csv files
+psm_list <- lapply(files, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  df$isDecoy <- as.logical(df$isDecoy)  # normalize column type just in case
+  return(df)
+})
+
+# Safely combine #i am saving psm_list as psm because the task wanted a psm object.
+psm <- bind_rows(psm_list)
+
+# Rename to 'id' to match course script style
+id <- psm
+
+# TASK 2 — Preprocessing: convert to tibble
+idtbl <- as_tibble(id)
+
+# Remove decoys
+idtbl <- idtbl %>%
+  filter(!isDecoy)
+
+# Keep only top-rank hits
+idtbl <- idtbl %>%
+  filter(rank == 1)
+
+# OPTIONAL: Remove ambiguous (multi-matching) spectra
+mltm <- idtbl %>%
+  count(spectrumID) %>%
+  filter(n > 1) %>%
+  pull(spectrumID)
+
+idtbl <- idtbl %>%
+  filter(!spectrumID %in% mltm)
+
+# TASK 3 — Identification summary
+cat("Unique peptides:", length(unique(idtbl$peptide_ref)), "\n")
+cat("Unique proteins:", length(unique(idtbl$accession)), "\n")
+
+# Peptide to protein mapping
+pep_prot_map <- idtbl %>%
+  select(peptide_ref, accession) %>%
+  distinct()
+
+pep_counts <- pep_prot_map %>%
+  group_by(accession) %>%
+  summarise(n_peptides = n())
+
+# View top proteins by number of peptides
+head(arrange(pep_counts, desc(n_peptides)), 10)
+
+# Summary output for report
+
+cat("📊 INITIAL DATA SUMMARY\n")
+cat("Total PSMs before filtering:", nrow(id), "\n")
+cat(" - Decoy PSMs:", sum(id$isDecoy), "\n")
+cat(" - Target PSMs:", sum(!id$isDecoy), "\n\n")
+
+cat("📦 AFTER FILTERING\n")
+cat("Total PSMs kept (non-decoy, rank 1, no ambiguity):", nrow(idtbl), "\n")
+cat("Unique peptides:", length(unique(idtbl$sequence)), "\n")
+cat("Unique proteins:", length(unique(idtbl$accession)), "\n")
+
+
+
+```
