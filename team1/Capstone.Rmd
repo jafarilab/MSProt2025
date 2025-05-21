@@ -1,0 +1,197 @@
+---
+title: "Capstone"
+author: "Milda"
+date: "2025-05-18"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Step1: Load libraries
+```{r}
+library(QFeatures)
+library(SummarizedExperiment)
+library(tidyverse)
+library(MSnbase)
+library("rpx")
+library(readr)
+library(dplyr)
+library(UniProt.ws)
+library(biomaRt)
+```
+
+#We are using csv, so some of the script provided in the course would not work as it is for mzID. But there is nothing chatGPT can't help with. Just be aware of this differnce.
+
+```{r}
+px <- PXDataset("PXD061542")
+pxget(px, grep("mzID", pxfiles(px)) #no mzID in this database
+pxget(px, grep("mzML", pxfiles(px))
+
+# TASK 1 — Load CSV files into 'psm' (like creating a PSM object) #we here need to load reader for the csv files
+
+# Load all .csv files using read_csv (not read.csv) #here because we have 10 csv files, so it is easier if we just combine them together. please change the path to where you save it.
+files <- list.files("C:/Users/milda/Capstone/data", pattern = "\\.csv$", full.names = TRUE)
+
+# Read and standardize #here i am just making the psm list from the csv files
+psm_list <- lapply(files, function(f) {
+  df <- read_csv(f, show_col_types = FALSE)
+  df$isDecoy <- as.logical(df$isDecoy)  # normalize column type just in case
+  return(df)
+})
+
+# Safely combine #i am saving psm_list as psm because the task wanted a psm object.
+psm <- bind_rows(psm_list)
+
+# Rename to 'id' to match course script style
+id <- psm
+
+# TASK 2 — Preprocessing: convert to tibble
+idtbl <- as_tibble(id)
+
+# Remove decoys
+idtbl <- idtbl %>%
+  filter(!isDecoy)
+
+# Keep only top-rank hits
+idtbl <- idtbl %>%
+  filter(rank == 1)
+
+# OPTIONAL: Remove ambiguous (multi-matching) spectra
+mltm <- idtbl %>%
+  count(spectrumID) %>%
+  filter(n > 1) %>%
+  pull(spectrumID)
+
+idtbl <- idtbl %>%
+  filter(!spectrumID %in% mltm)
+
+# TASK 3 — Identification summary
+cat("Unique peptides:", length(unique(idtbl$peptide_ref)), "\n")
+cat("Unique proteins:", length(unique(idtbl$accession)), "\n")
+
+# Peptide to protein mapping
+pep_prot_map <- idtbl %>%
+  select(peptide_ref, accession) %>%
+  distinct()
+
+pep_counts <- pep_prot_map %>%
+  group_by(accession) %>%
+  summarise(n_peptides = n())
+
+# View top proteins by number of peptides
+head(arrange(pep_counts, desc(n_peptides)), 10)
+
+# Summary output for report
+
+cat("📊 INITIAL DATA SUMMARY\n")
+cat("Total PSMs before filtering:", nrow(id), "\n")
+cat(" - Decoy PSMs:", sum(id$isDecoy), "\n")
+cat(" - Target PSMs:", sum(!id$isDecoy), "\n\n")
+
+cat("📦 AFTER FILTERING\n")
+cat("Total PSMs kept (non-decoy, rank 1, no ambiguity):", nrow(idtbl), "\n")
+cat("Unique peptides:", length(unique(idtbl$sequence)), "\n")
+cat("Unique proteins:", length(unique(idtbl$accession)), "\n")
+```
+
+#TASKS 4-6 (Milda)
+#Step2: Load data
+```{r}
+# Set folder path, where the csv-file are saved from earlier steps
+data_dir <- "C:/Users/milda/Capstone/data"
+
+# Read all CSV files
+files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# Read and combine all files
+psm_data <- files %>%
+  map_dfr(readr::read_csv, show_col_types = FALSE)
+
+# Replace all NAs with dummy values
+psm_data[is.na(psm_data)] <- "missing"
+
+# Convert intensity column
+psm_data$experimentalMassToCharge <- as.numeric(psm_data$experimentalMassToCharge)
+psm_data$experimentalMassToCharge[is.na(psm_data$experimentalMassToCharge)] <- 0
+
+# Rename expected columns
+psm_data <- psm_data %>%
+  rename(Intensity = experimentalMassToCharge,
+         Sequence = sequence,
+         ProteinGroup = accession)
+
+# Create unique rownames
+psm_data <- psm_data %>%
+  mutate(rowname = paste0("row_", row_number()))
+
+#Below code is for debugging of the code.
+#Subset for testing: only use first 1000 rows
+#psm_data <- psm_data %>% slice(1:1000)
+```
+#Step3: Convert to QF
+```{r}
+psm_se <- readSummarizedExperiment(psm_data,
+                                   quantCols = "Intensity",
+                                   fnames = "rowname")
+
+qf <- QFeatures(list(PSMs = psm_se))
+```
+#Step4: Aggregate PSM to PEP
+```{r}
+qf <- aggregateFeatures(qf,
+                        i = "PSMs",
+                        fcol = "Sequence",
+                        name = "peptides",
+                        fun = colMeans)
+```
+#Step5: Aggregate PEP to PROT
+```{r}
+qf <- aggregateFeatures(qf,
+                        i = "peptides",
+                        fcol = "ProteinGroup",
+                        name = "proteins",
+                        fun = colMeans)
+```
+#Step6: Normalize & Impute
+```{r}
+qf[["proteins"]] <- normalize(qf[["proteins"]], method = "quantiles")
+
+qf[["proteins"]] <- impute(qf[["proteins"]], method = "knn")
+```
+#Step7: PROT QUANT TABLE
+```{r}
+head(assay(qf[["proteins"]]))
+```
+#Step8: Save as CSV 
+```{r}
+
+# Clean UniProt IDs from "sp|P12345|..." to "P12345"
+protein_ids_raw <- rownames(assay(qf[["proteins"]]))
+protein_ids <- sub("^sp\\|([^|]+)\\|.*$", "\\1", protein_ids_raw)
+
+# Connect to Ensembl BioMart for human
+ensembl <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# Get annotations using valid attributes
+annotations <- getBM(
+  attributes = c("uniprotswissprot", "external_gene_name", "description"),
+  filters = "uniprotswissprot",
+  values = protein_ids,
+  mart = ensembl
+)
+
+# Rename to match table
+colnames(annotations)[1] <- "ProteinGroup"
+
+# Prepare protein assay table
+protein_df <- as.data.frame(assay(qf[["proteins"]]))
+protein_df$ProteinGroup <- protein_ids
+
+# Merge data
+annotated_df <- dplyr::left_join(protein_df, annotations, by = "ProteinGroup")
+
+# Export annotated protein table, change "C:/..." to where you want the file to be saved.
+write.csv(annotated_df, "C:/Users/milda/Capstone/proteins_annotated.csv", row.names = FALSE)
+```
