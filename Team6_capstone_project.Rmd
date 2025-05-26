@@ -17,6 +17,12 @@
 library(rpx)
 px <- PXDataset("PXD054877")  # Create a PXDataset object for the dataset with ID "PXD056514" #female
 pxfiles(px) ## Retrieve and display a list of all files associated with the PXDataset object 'px'
+
+```
+
+```{r}
+files <- pxfiles(px) #Retrieve and display a list of all files associated with the PXDataset object 'px'
+mzid_files <- pxget(px, grep("mzid", pxfiles(px))) #Identify the .mzID files from the retrieved files
 ```
 
 
@@ -37,17 +43,36 @@ library(PSMatch)
 library(ggplot2)
 ```
 
-# Step 1: Access the dataset
+
 ```{r}
-files <- pxfiles(px) #Retrieve and display a list of all files associated with the PXDataset object 'px'
-mzid_files <- pxget(px, grep("mzid", pxfiles(px))) #Identify the .mzID files from the retrieved files
+psms <- PSM(mzid_files, parser = 'mzID') #Convert .mzID files into PSM objects
 ```
-```{r}
-psms <- PSM(mzid_files, parser = 'mzID')
-```
+
 ```{r}
 names(psms)
 ```
+```{r}
+# PSM rank
+#    * Number of decoy hits
+#no isdecoy column
+library("dplyr")
+psm_df <- tidyr::as_tibble(psms)
+psm_df
+#Converted into dataframe because it is just easier to check in environment and easier to work on for me. Please ignore this if you don't want to do dataframe and read the columns in similar way as line 58 hist script :) but the dataframe is for exploring and visualization only. we will do filtering in actual object psms in later steps
+sum(is.na(psm_df$description)) #0 #one way is to check if there are proteins without description. -> No NAs in description
+#Another idea we discussed was that if the peak score is low (for eg 0), they could be removed as decoy. So I will come back to that in later step after score distribution
+```
+
+
+```{r}
+#    * Number of decoy hits
+#no isdecoy column
+#Converted into tibble because it is just easier to check in environment and easier to work on for me. as  hist script :) 
+sum(is.na(psm_df$description)) #0 #one way is to check if there are proteins without description. -> No NAs in description
+#Another idea we discussed was that if the peak score is low (for eg 0), they could be removed as decoy. So I will come back to that in later step after score distribution
+```
+
+
 
 ```{r}
 #Score distributions
@@ -56,7 +81,7 @@ score_distribution <- summary(id$`Mascot:score`)
 score_distribution <- summary(psms@listData$`mascot:score`)
 print(score_distribution)
 #hist(psms@listData$`mascot:score`, breaks = 100) #one way to do histogram
-psm_df <- as.data.frame(psms) #Converted into dataframe because it is just easier to check in environment and easier to work on for me. Please ignore this if you don't want to do dataframe and read the columns in similar way as line 58 hist script :) but the dataframe is for exploring and visualization only. we will do filtering in actual object psms in later steps
+
 table(psm_df$passthreshold) #true#57251 may be after removing decoys or delta score or mascot score thereshold? 
 
 library(ggplot2)
@@ -68,6 +93,7 @@ ggplot(psm_df, aes(x = mascot.score)) +
   theme_minimal() 
 ```
 ```{r}
+
 #when filtering one plan is to remove everything at 0. just exploring where to filter
 ggplot(psm_df, aes(x = mascot.score)) +
   geom_density(fill = "blue", alpha = 0.5) +  # Fill color for the density plot
@@ -79,12 +105,6 @@ ggplot(psm_df, aes(x = mascot.score)) +
 ```
 
 
-```{r}
-#decoy
-#no isdecoy column
-#one way is to check if there are proteins without description?
-sum(is.na(psm_df$description)) #0
-```
 
 ```{r}
 # PSM rank
@@ -93,9 +113,15 @@ print(psm_rank_distribution) #we dont have many that have higher rank
 ```
 
 ```{r}
-#Apply filtering based on FDR or identification score (keeping mascot score >1)?
-#not using dataframe bit 
-
+#Apply filtering based on FDR or identification score ?
+psms <- psms %>% filterPsmRank() #keeping only those with rank 1 #skip this?
+psms <- filterPsmFdr(psms, FDR = 0.05, fdr = psmVariables(psms)["fdr"], verbose = TRUE) #if we had fdr column, we don't have that column
+psm_df <- tidyr::as_tibble(psms)
+orig_df <- nrow(psm_df)
+psm_df <- psm_df %>% filter(mascot.score > 0) #filtering based on identification score becuase we do not have decoys adn fdr in this data
+filtered_df <- nrow(psm_df)
+number_of_decoys <- orig_df -filtered_df
+(number_of_decoys) 
 ```
 
 ```{r}
@@ -105,17 +131,7 @@ adjacencyMatrix(psms)
 
 
 
-#Apply filtering based on FDR or identification score
-threshold <- 0.01  # Set your FDR or score threshold
-#I dont see fdr in this data, also which score?
 
-#i dont know which score to use
-library(ggplot2)
-ggplot(id, aes(x =  `Mascot:score`,
-               colour = isDecoy)) +
-  geom_density()
-
----
   
 ### 3. 🧬 Protein & Peptide Identification  
 # **Goal:** Determine identified peptides and proteins  
@@ -123,30 +139,53 @@ ggplot(id, aes(x =  `Mascot:score`,
 #Review peptide-to-protein mapping:
 #Razor proteins
 #Protein groups
+```{r}
+describePeptides(psms) #number of peptides in unfiltered dataset
 
-identified_peptides <- unique(id$peptide)  # Get unique peptides
-length(identified_peptides)
-#23785
-identified_proteins <- unique(id$accession)  # Get unique protein accessions 
-length(identified_proteins)
-#8055
+dim(psm_df)
+nrow(psm_df)
+length(unique(psm_df$pepseq)) #peptides #1644 after filtering
+length(unique(psm_df$accession)) #proteins? #431
+```
 
-# Create a mapping of peptides to proteins
-peptide_to_protein_mapping <- table(id$peptide, id$accession)
+```{r}
+adj <- makeAdjacencyMatrix(psms) #this one is without the mascot.score <0 removed because i dont know how to convert tibble to psm again. but rank 1 is filtered. 
+dim(adj)
+```
+```{r}
+length(unique(psms$sequence))
+length(unique(psms$DatabaseAccess))
+cc <- ConnectedComponents(adj)
+length(cc)
+cc
+(i <- which(nrows(cc) > 2 & ncols(cc) > 2))
+dims(cc)[i, ]
+cx <- connectedComponents(cc, 172) #plotting this for simplicity because this component has low number of rows 17 rows(fragments?)
+cx
+plotAdjacencyMatrix(cx)
+plotAdjacencyMatrix(cx, 1)
 
-library(dplyr)
-razor_proteins <- id %>%
-  group_by(peptide) %>%  # Group by peptide
-  filter(!is.na(accession)) %>%  # Filter out NA accessions
-  slice(which.max(`Mascot:score`)) %>%  # Select the highest-scoring protein
-  ungroup() %>%  # Ungroup to return to the original data frame structure
-  select(peptide, Leading.razor.protein = accession)  # Select relevant columns
-#For all 23785 peptides
-table(razor_proteins$Leading.razor.protein)
-length(unique(razor_proteins$Leading.razor.protein)) #7716 proteins. There are so many. may be there can't be so many razor proteins. are these protein groups then?
+```
+```{r}
+#Among the 1817 and the 464 proteins, we have 363 connected components.
 
-#Protein groups (based on unique accessions)
-proteins <- unique(id$accession)  # Extract unique protein accessions
+#164 correspond to single proteins identified by single peptide. 
+#0 represent protein groups identified by a single shared peptide
+#159 represent single proteins identified by multiple unique peptides:
+#Finally, arguable those that warrant additional exploration are those that are composed of multiple peptides and multiple proteins. There are 40 thereof in this identification
+
+#which means there are 464 unique sequences.
+#there are no unique database accesses recorded in the dataset.
+#there are 363 connected components in the graph.
+#The line (i <- which(nrows(cc) > 2 & ncols(cc) > 2)) identifies the indices of connected components that have more than 2 rows and more than 2 columns.
+#The output dims(cc)[i, ] shows the dimensions (number of rows and columns) of these selected connected components
+#10 components have more than 2 rows and more than 2 columns, with varying sizes, the largest being 244 rows by 29 columns.
+```
+
+
+```{r}
+#trying to find razor proteins
+```
 
 ---
   
