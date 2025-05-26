@@ -77,7 +77,6 @@ sum(is.na(psm_df$description)) #0 #one way is to check if there are proteins wit
 ```{r}
 #Score distributions
 # Score distributions
-score_distribution <- summary(id$`Mascot:score`)
 score_distribution <- summary(psms@listData$`mascot:score`)
 print(score_distribution)
 #hist(psms@listData$`mascot:score`, breaks = 100) #one way to do histogram
@@ -193,31 +192,6 @@ cc
 
 ---
   
-### 4. 🔄 QFeature Aggregation (Optional)  
-# **Goal:** Use quantification data if available  
-  
-#Use `aggregateFeatures()` from the `QFeatures` package to aggregate:
-  #PSMs ➡️ Peptides ➡️ Proteins
-
-library(QFeatures)
-library(dplyr)  
-qfeatures <- QFeatures(list(PSM = SummarizedExperiment(assays = list(lognorm_peptides = as.matrix(id)))))
-# Assuming 'peptide' is the column with peptide sequences and 'Mascot:score' is the scoring metric
-
-rowData(qfeatures[["PSM"]])
-qfeatures[["PSM"]]
-data("b1370p17_S9_Tot_Prot_P31_FRAX_24h_1000nM_3.RAW.-1.mgf")
-
-qfeatures <- aggregateFeatures(qfeatures,
-                               i = "PSM",  # Input assay
-                               name = "Peptides",  # Name of the new aggregated feature
-                               fcol = "peptide",  # Column containing peptide sequences
-                               fun = colMeans,  # Aggregation function (mean of scores, for example)
-                               na.rm = TRUE)
-
-library(MSnbase)
-
-
 
 ---
   
