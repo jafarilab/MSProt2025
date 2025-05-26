@@ -167,7 +167,11 @@ plotAdjacencyMatrix(cx, 1)
 
 ```
 ```{r}
-#Among the 1817 and the 464 proteins, we have 363 connected components.
+cc
+```
+
+```{r}
+#Among the 1817 and the 464 proteins, we have 363 connected components. 
 
 #164 correspond to single proteins identified by single peptide. 
 #0 represent protein groups identified by a single shared peptide
