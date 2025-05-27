@@ -104,6 +104,21 @@ ggplot(psm_df, aes(x = mascot.score)) +
 ```
 
 
+```{r}
+plot <- ggplot(psm_df, aes(x = mascot.score)) + geom_density(alpha = 0.5) +  # 
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +  # Vertical line at x = 1
+  labs(title = "Density Plot of Mascot Scores", x = "Mascot Score",y = "Density") +theme_minimal() 
+file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", "mascot_score_histogram.png")
+png(file, height=1000,width=1000,res=200)
+print(plot)
+dev.off()
+
+plot <- ggplot(psm_df, aes(x = mascot.score)) +geom_density()+ labs(title = "Density Plot of Mascot Scores", x = "Mascot Score",y = "Density") +theme_minimal() 
+file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", "mascot_score_histogram_no_red_line.png")
+png(file, height=1000,width=1000,res=200)
+print(plot)
+dev.off()
+```
 
 ```{r}
 # PSM rank
@@ -159,14 +174,30 @@ length(cc)
 cc
 (i <- which(nrows(cc) > 2 & ncols(cc) > 2))
 dims(cc)[i, ]
-cx <- connectedComponents(cc, 372) #plotting this for simplicity because this component has low number of rows 17 rows(fragments?)
+cx <- connectedComponents(cc, 326) #plotting this for simplicity because this component has low number of rows 17 rows(fragments?)
 cx
 plotAdjacencyMatrix(cx)
-plotAdjacencyMatrix(cx, 1)
-
 ```
 ```{r}
 cc
+```
+```{r}
+#file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", #"one_multiple_peptides_and_multiple_proteins_outOf_56.png")
+#png(file, height=2500,width=2500,res=200)
+#plotAdjacencyMatrix(cx)
+#dev.off()
+
+#cx <- connectedComponents(cc, 383)
+#file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", #"another_example_of_multiple_peptides_and_multiple_proteins_outOf_56.png")
+#png(file, height=2500,width=2500,res=200)
+#plotAdjacencyMatrix(cx)
+#dev.off()
+```
+
+```{r}
+cc_dims <- as.data.frame(dims(cc))
+colnames(cc_dims) <- c("num_of_rows", "num_of_cols")
+cc_dims <- cc_dims %>% filter(num_of_cols>1)
 ```
 
 ```{r}
