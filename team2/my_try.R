@@ -186,3 +186,15 @@ ggplot(top30_1, aes(x = log2FC, y = reorder(Gene_names, log2FC))) +
        x = "Log2 Fold Change (FLG vs MOCK)",
        y = "Gene Name") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray")
+
+
+## Removing contaminants from the evidence file
+m<-read.delim("D:\\MS_course\\combined\\txt\\evidence.txt", header = TRUE, sep = "\t")
+
+# Remove decoys
+n <- m %>% filter(is.na(Reverse) | Reverse == "")
+
+#Remove contaminants
+n <- n %>% filter(is.na(Potential.contaminant) | Potential.contaminant == "")
+
+n_fil <- n[!(n$Leading.razor.protein %in% cont_prot), ]
