@@ -44,6 +44,7 @@ idtbl <- as_tibble(id)
 # Remove decoys
 idtbl <- idtbl %>%
   filter(!isDecoy)
+idtbl$isDecoy <- grepl("^rev_|^DECOY_", idtbl$ProteinAccessions)
 
 # Keep only top-rank hits
 idtbl <- idtbl %>%
