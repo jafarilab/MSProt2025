@@ -179,6 +179,11 @@ cx
 plotAdjacencyMatrix(cx)
 ```
 ```{r}
+(i <- which(nrows(cc) > 1 & ncols(cc) > 1))
+length(i)
+#Protein groups that have at least one connection to another protein and at least one peptide.
+```
+```{r}
 cc
 ```
 ```{r}
@@ -198,6 +203,14 @@ cc
 cc_dims <- as.data.frame(dims(cc))
 colnames(cc_dims) <- c("num_of_rows", "num_of_cols")
 cc_dims <- cc_dims %>% filter(num_of_cols>1)
+```
+
+```{r}
+cc_dims <- as.data.frame(as.matrix(adj))
+cc_dims[] <- ifelse(cc_dims == 0, 0, 1)
+cc_dims$row_sum <- rowSums(cc_dims)
+cc_dims <- cc_dims %>% filter(row_sum > 1)
+cc_dims <- cc_dims %>% select(row_sum)
 ```
 
 ```{r}

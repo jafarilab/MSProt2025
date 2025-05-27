@@ -179,8 +179,20 @@ dims(cc)[i, ]
 cx <- connectedComponents(cc, 260) #has 5 proteins, they share some peptides with another. 
 cx
 plotAdjacencyMatrix(cx)
-
 ```
+```{r}
+(i <- which(nrows(cc) > 1 & ncols(cc) > 1))
+length(i)
+razor_prot <- as.data.frame(dims(cc[i,]))
+#Protein groups that have at least one connection to another protein and at least one peptide.
+```
+
+```{r}
+(i <- which(nrows(cc) > 1 & ncols(cc) == 1))
+length(i)
+#Protein groups that have at least one connection to another protein and at least one peptide.
+```
+
 
 ```{r}
 #file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/female/", #"one_multiple_peptides_and_multiple_proteins_outOf_40.png")
@@ -194,11 +206,20 @@ cc
 ```
 ```{r}
 connectedComponents(cc,1)
+connectedComponents(cc,201)
 ```
 ```{r}
 cc_dims <- as.data.frame(dims(cc))
 colnames(cc_dims) <- c("num_of_rows", "num_of_cols")
 cc_dims <- cc_dims %>% filter(num_of_cols>1)
+```
+
+```{r}
+cc_dims <- as.data.frame(as.matrix(adj))
+cc_dims[] <- ifelse(cc_dims == 0, 0, 1)
+cc_dims$row_sum <- rowSums(cc_dims)
+cc_dims <- cc_dims %>% filter(row_sum > 1)
+cc_dims <- cc_dims %>% select(row_sum)
 ```
 
 ```{r}
