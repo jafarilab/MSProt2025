@@ -115,19 +115,19 @@ table(nc_maxquant_fil$Number.of.proteins)
 ggplot(nc_maxquant_fil, aes(x = `Score`)) +
   geom_density(fill = "lightblue") +
   labs(title = " Score Distribution")+
-  geom_vline(xintercept = 7.5, 
+  geom_vline(xintercept = 10, 
              color = "red", linetype = "dashed", size = 0.5)
 
 
-#filtering based on score >7.5
-high_conf_maxquant <- subset(nc_maxquant_fil, `Score` > 7.5)
+#filtering based on score >10
+high_conf_maxquant <- subset(nc_maxquant_fil, `Score` > 10)
 
 #without filtering
 high_conf_maxquant1 <- nc_maxquant_fil
 
 lfq_cols <- grep("^LFQ\\.intensity\\.", names(high_conf_maxquant), value = TRUE)
 exprs <- high_conf_maxquant[, lfq_cols]
-rownames(exprs) <- high_conf_maxquant$Protein.IDs
+rownames(exprs) <- high_conf_maxquant$Majority.protein.IDs
 
 # Convert to numeric and log2 transform
 enrichment <- exprs[, "LFQ.intensity.flg"] / exprs[, "LFQ.intensity.mock"]
