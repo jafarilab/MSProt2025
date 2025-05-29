@@ -6,6 +6,7 @@
 
 <p align="center">
 This is the repository for Mass Spectrometry-Based Proteomics: Concepts, Methods, and Data course at the University of Helsinki.
+  Spring 2025
 </p>
 
 ---
