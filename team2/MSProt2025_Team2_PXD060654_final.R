@@ -14,10 +14,9 @@ install.packages("BiocManager")
 
 library(BiocManager)
 
-# Bioconductor packages
-# if (!requireNamespace("BiocManager", quietly = TRUE))
-#     install.packages("BiocManager")
-#
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
 BiocManager::install("tidyverse")
 BiocManager::install("factoextra")
 BiocManager::install("msdata")
@@ -34,21 +33,7 @@ BiocManager::install("limma")
 BiocManager::install("MSnID")
 BiocManager::install("remotes")
 BiocManager::install("RforMassSpectrometry/SpectraVis")
-
-library(rpx)
-library(msdata)
-library(Spectra)
-library(MSnbase)
-library(SpectraVis)
-library(tidyverse)
-library(mzR)
-library(PSMatch)
-library(mzID)
-library(Biostrings)
-library(QFeatures)
-library(SummarizedExperiment)
-library(limma)
-library(Biostrings)
+BiocManager::install("Biostrings")
 
 #   ### 2. 🧱 PSM Object Creation & Preprocessing  
 #   **Goal:** Generate a PSM (Peptide-Spectrum Match) object from `.mzID` files  
@@ -60,57 +45,34 @@ library(Biostrings)
 # - PSM rank
 # - Apply filtering based on FDR or identification score
 
+library(dplyr)
+library(ggplot2)
+library(PSMatch)
+library(Biostrings)
+library(tibble)
+library(tidyr)
+library(mzR)
+library(Rcpp)
+
+# Access dataset using ProteomeXChange accession code
 px <- PXDataset("PXD060654")
-f <-pxget(px, grep("mzid", pxfiles(px)))
 
-mzid <- mzID("D:\\MS_course\\MS_2369_mock-vs-flg-combined_031424.mzid")
+# Retrieve list of files in px
+f <-pxfiles(px)
 
-mzid_obj <- mzID("D:\\MS_course\\MS_2369_mock-vs-flg-combined_031424.mzid")
-id <-"D:\\MS_course\\MS_2369_mock-vs-flg-combined_031424.mzid"
-psm <- PSMatch::PSM(id)
+# Extract peptide-spectrum match data into object
+psm <- PSMatch::PSM("C:/Users/janni/Downloads/39fc2ba81653_MS_2369_mock-vs-flg-combined_031424.mzid")
 
+# Convert the PSM to a tibble (modern data frame)
 psms <- flatten(mzid)
-
 idtbl <- as_tibble(psms)
 names(idtbl)
-table(idtbl$rank, useNA = "ifany") #ranks mentioned
 
-idtbl <- idtbl |>  filter(!isDecoy) - did not find any
+# Distribution of ranks and include any missing values (NA)
+table(idtbl$rank, useNA = "ifany")
 
-idtblr1 <- idtbl |>  filter(rank == 1) # filtering only rank 1 peptides
-
-dplyr::count(idtblr1, spectrumid)
-
-dplyr::count(idtblr1, spectrumid) |>   filter(n >1) #remove repeated spectrums to the protein
-
-(mltm <- dplyr::count(idtblr1, spectrumid) |>     filter(n > 1) |>     pull(spectrumid)) # creating object that pulls all the spectrum ids that match more than once to the protein
-
-(idtbl_fil <- idtblr1 |>    filter(!spectrumid %in% mltm)) #Filter out IDs matched with more than 1 protein
-
-length(unique(idtbl_fil$pepseq))       # Peptides
-length(unique(idtbl_fil$accession))
-
-# Read FASTA with contaminants from the PXD060654
-fasta <- readAAStringSet("I:/MSProt2025/idmapping_2025_05_27.fasta/file63881f23791e.fasta")
-
-# Extract headers
-prot_names <- names(fasta)
-
-# Optionally just IDs (e.g., split at first space)
-cont_prot<- sapply(strsplit(prot_names, "\\|"), `[`, 2)
-
-present_in_psms <- cont_prot %in% idtbl_fil$accession
-nc_idtbl_fil <- idtbl_fil[!(idtbl_fil$accession %in% cont_prot), ]
-
-length(unique(nc_idtbl_fil$pepseq))       # Peptides
-length(unique(nc_idtbl_fil$accession))
-
-# Plot SEQUEST XCorr Score Distribution in a bar plot
-library(ggplot2)
-
-ggplot(nc_idtbl_fil, aes(x = `sequest:xcorr`)) +
-  geom_density(fill = "lightblue") +
-  labs(title = "SEQUEST XCorr Score Distribution")
+# Filter out decoy peptides (from "isDecoy" column)
+idtbl <- idtbl |>  filter(!isDecoy) # No decoys found
 
 # Plot PSM rank distribution in a bar plot
 ggplot(idtbl, aes(x = factor(rank))) +
@@ -122,23 +84,45 @@ ggplot(idtbl, aes(x = factor(rank))) +
   ) +
   theme_minimal()
 
-# Plot Scores by Rank using boxplot
-ggplot(idtbl, aes(x = factor(rank), y = `sequest:xcorr`)) +
-  geom_boxplot(fill = "lightgreen") +
-  labs(
-    title = "XCorr Score by PSM Rank",
-    x = "Rank",
-    y = "SEQUEST:xcorr"
-  ) +
+# Include only rows with rank 1
+idtbl_filt <- idtbl |> filter(rank == 1)
+
+length(unique(idtbl_filt$pepseq))
+length(unique(idtbl_filt$accession))
+
+# Visualize how many times a specific spectrumid is matched to a peptide
+spectrum_counts <- dplyr::count(idtbl_filt, spectrumid)
+ggplot(spectrum_counts, aes(x = n)) +
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Spectrum ID Occurrences", 
+       x = "Number of Occurrences", 
+       y = "Frequency") +
   theme_minimal()
 
-high_conf <- subset(nc_idtbl_fil, `sequest:xcorr` > 2.0 & rank == 1)
+# Count occurrences of each spectrumid in idtbl_filt
+mltm <- dplyr::count(idtbl_filt, spectrumid) |> 
+  filter(n > 1) |> 
+  pull(spectrumid)  # Spectrum IDs that match more than one peptide
 
-length(unique(high_conf$pepseq))       # Peptides
-length(unique(high_conf$accession))
+# Filter idtblr1 to remove spectra matched to more than one peptide
+idtbl_filt2 <- idtbl_filt |> 
+  filter(!spectrumid %in% mltm)
 
-# so after everything we have 21107 unique peptides and 3288 unique proteins in the mzID file
+# Read FASTA with contaminants from the PXD060654
+fasta <- readAAStringSet("C:/Users/janni/OneDrive/Työpöytä/HU - Proteomics 2025/MSProt2025_New_fork/MSProt2025_Team2/team2/file63881f23791e.fasta")
 
+# Extract headers
+prot_names <- names(fasta)
+
+# Extract only IDs (e.g., split at first space)
+cont_prot<- sapply(strsplit(prot_names, "\\|"), `[`, 2)
+
+# Filter out rows with accession codes matching contaminants fasta
+nc_idtbl_fil2 <- idtbl_filt2[!(idtbl_filt2$accession %in% cont_prot), ]
+
+# Count unique peptides and proteins
+length(unique(nc_idtbl_fil$pepseq)) # 21107 unique peptides
+length(unique(nc_idtbl_fil$accession)) # 3288 unique proteins
 
 #   ### 3. 🧬 Protein & Peptide Identification  
 #   **Goal:** Determine identified peptides and proteins  
@@ -149,26 +133,28 @@ length(unique(high_conf$accession))
 # - Protein groups
 
 library(dplyr)
-library(readr)
+library(ggplot2)
+library(stringr)
+library(Biostrings) 
 
 # Path to files for MaxQuant output data
-evidence_path <- "I:/MSProt2025/combined (2)/combined/txt/evidence.txt"
-proteinGroups_path <- "I:/MSProt2025/combined (2)/combined/txt/proteinGroups.txt"
-peptides_path <- "I:/MSProt2025/combined (2)/combined/txt/peptides.txt"
+evidence_path <- "C:/Users/janni/Downloads/combined (2)/combined/txt/evidence.txt"
+proteinGroups_path <- "C:/Users/janni/Downloads/combined (2)/combined/txt/proteinGroups.txt"
+msms_path <- "C:/Users/janni/Downloads/combined (2)/combined/txt/msms.txt"
 
 # Load data
 evidence_data <- read.delim(evidence_path, sep = "\t", stringsAsFactors = FALSE)
 proteinGroups_data <- read.delim(proteinGroups_path, sep = "\t", stringsAsFactors = FALSE)
-peptides_data <- read.delim(peptides_path, sep = "\t", stringsAsFactors = FALSE)
+msms_data <- read.delim(msms_path, sep = "\t", stringsAsFactors = FALSE)
 
-names(proteinGroups_data)
-head(proteinGroups_data)
+colnames(evidence_data)
+colnames(proteinGroups_data)
+colnames(msms_data)
 
 # Find contaminants, decoy/reverse hits
 dim(evidence_data) # 128 768 rows
 colnames(evidence_data)
-table(evidence_data$Potential.contaminant) # < table of extent 0 >, no contaminants data
-table(evidence_data$Reverse) # 36 Reverse (+)
+table(evidence_data$Reverse) # 112 decoys/reverse (+)
 
 # Filter decoys
 evidence_filt <- evidence_data %>%
@@ -178,26 +164,19 @@ dim(evidence_filt) # 128 656 rows
 
 #remove contaminant
 head(evidence_filt$Leading.razor.protein)
-evidence_filt2 <- evidence_filt[!(evidence_filt$Leading.razor.protein %in% cont_prot), ]
+nc_evidence_filt <- evidence_filt[!(evidence_filt$Leading.razor.protein %in% cont_prot), ]
 
-dim(evidence_filt2) # 127 618 rows
+dim(nc_evidence_filt) # 127 618 rows
 
-# Plot Score Distribution in a bar plot
-ggplot(evidence_filt2, aes(x = `Score`)) +
-  geom_density(fill = "lightblue") +
-  labs(title = "Score Distribution")
+# Count unique peptides and proteins
+length(unique(nc_evidence_filt$Sequence)) # 23 964 unique peptides
+length(unique(nc_evidence_filt$Proteins)) # 3399 unique proteins
+length(unique(nc_evidence_filt$Leading.razor.protein)) # 2559 leading razor proteins
+length(unique(nc_evidence_filt$Protein.group.IDs)) # 3048 protein groups
 
-#number of unique peptides, 23 964
-length(unique(evidence_filt2$Sequence))
-
-#number of unique proteins, 3399
-length(unique(evidence_filt2$Proteins))
-
-#number of leading razor proteins, 2559
-length(unique(evidence_filt2$Leading.razor.protein))
 
 # Table showing how many proteins each peptide maps to
-peptide_to_protein_map <- evidence_filt2 %>%
+peptide_to_protein_map <- nc_evidence_filt %>%
   select(Modified.sequence, Proteins) %>%
   mutate(n_proteins = lengths(strsplit(Proteins, ";"))) %>%
   group_by(n_proteins) %>%
@@ -206,8 +185,6 @@ peptide_to_protein_map <- evidence_filt2 %>%
 print(peptide_to_protein_map)
 
 # Plot peptide-to-protein-mapping overview as a barplot
-library(ggplot2)
-
 ggplot(peptide_to_protein_map, aes(x = factor(n_proteins), y = n_peptides)) +
   geom_col(fill = "steelblue") +
   labs(
@@ -217,92 +194,87 @@ ggplot(peptide_to_protein_map, aes(x = factor(n_proteins), y = n_peptides)) +
   ) +
   theme_minimal()
 
-# Distribution of protein group sizes
-table(proteinGroups_filt2$Number.of.proteins)
-
-#   ### 4. 🔄 QFeature Aggregation (Was not performed due to problems with aggregation and access to data in output file)  
-#   **Goal:** Use quantification data if available  
-# ↓  
-# Use `aggregateFeatures()` from the `QFeatures` package to aggregate:
-#   - PSMs ➡️ Peptides ➡️ Proteins
-
-#   ### 5. 🧼 Normalization & Imputation (We did not normalize or impute due to access to LFQ intensity values)  
+#   ### 5. 🧼 Normalization & Imputation   
 #   **Goal:** Correct for technical variation and handle missing values  
 # ↓  
 # - Normalize using `normalize()` or `normalize_vsn()`
 # - Impute missing values with `impute()`
 
-
-#  Summarizing evidence.txt to a protein-level intensity matrix
 library(dplyr)
 library(tidyr)
+library(SummarizedExperiment)
+library(vsn)
+library(MSnbase)
+library(impute)
 
-# Select needed columns
-protein_quant <- evidence_filt2 %>%
+# Filter and select relevant columns from evidence data
+protein_quant <- nc_evidence_filt %>%
   filter(!is.na(Intensity) & Intensity > 0) %>%
   select(Leading.razor.protein, Raw.file, Intensity)
-head(protein_quant)
 
-# Summarize intensities: median
+# Summarize intensities by median per protein/sample
 protein_summary <- protein_quant %>%
   group_by(Leading.razor.protein, Raw.file) %>%
   summarize(Intensity = median(Intensity, na.rm = TRUE), .groups = "drop")
-head(protein_summary)
 
+# Pivot to wide format to create a protein-level intensity matrix
 protein_matrix <- protein_summary %>%
-  pivot_wider(names_from = Raw.file, values_from = Intensity)
+  pivot_wider(names_from = Raw.file, values_from = Intensity) %>%
+  as.data.frame()
 
-# Set protein IDs as row names
-protein_matrix <- as.data.frame(protein_matrix)
+# Set protein IDs as rownames
 rownames(protein_matrix) <- protein_matrix$Leading.razor.protein
-protein_matrix <- protein_matrix[, -1]
 
-head(protein_matrix)
-dim(protein_matrix)
-
-# if (!requireNamespace("BiocManager", quietly = TRUE))
-#   install.packages("BiocManager")
-# 
-# BiocManager::install("DEP")
-
-library(DEP)
-library(SummarizedExperiment)
-library(vsn)
-library(impute)
-library(dplyr)
-library(tibble)
-library(DEP)
-
-# Convert protein matrix to data frame with protein IDs as a column
+# Convert matrix to data frame with unique identifiers
 protein_df <- protein_matrix %>%
-  as.data.frame() %>%
   rownames_to_column(var = "name")
 
-# Create a unique identifier column manually (ID should exist or be created)
-protein_df$ID <- make.unique(protein_df$name)  # create 'ID' if not already there
+# Create unique identifiers if not present
+protein_df$ID <- make.unique(protein_df$name)
 protein_df$name_uniq <- paste0(protein_df$name, "_", protein_df$ID)
 
-# Identify the sample (intensity) columns — exclude ID columns
-id_cols <- c("name", "name_uniq", "ID")
-sample_cols <- which(!(colnames(protein_df) %in% id_cols))
-sample_names <- colnames(protein_df)[sample_cols]
+# Identify sample columns (exclude metadata/ID columns)
+id_cols <- c("name", "name_uniq", "ID", "Leading.razor.protein")
+sample_cols <- setdiff(colnames(protein_df), id_cols)
+sample_names <- sample_cols
 
-# Create sample annotation
+# Create sample annotation (adjust if needed)
 sample_annotation <- data.frame(
   label = sample_names,
-  condition = c("flg", "flg", "flg", "flg", "mock", "mock", "mock", "mock"),  # adjust if needed
+  condition = c("flg", "flg", "flg", "flg", "mock", "mock", "mock", "mock"),
   replicate = c(1, 2, 3, 4, 1, 2, 3, 4)
 )
-rownames(sample_annotation) <- sample_annotation$label
 
-# Create SummarizedExperiment object
-se <- make_se(protein_df, sample_annotation, columns = sample_cols)
+# Prepare the expression matrix
+exprs_mat <- as.matrix(protein_df[, sample_cols])
+rownames(exprs_mat) <- protein_df$name
 
-# Normalize
-se_norm <- normalize_vsn(se)
+# Create metadata for proteins (rowData)
+rowData <- data.frame(Protein_ID = rownames(exprs_mat))
+
+# Create the SummarizedExperiment object
+se <- SummarizedExperiment(
+  assays = list(counts = exprs_mat),
+  rowData = rowData,
+  colData = sample_annotation
+)
+
+# Normalize using Variance Stabilizing Normalization (VSN)
+vsn_fit <- vsn2(assay(se, "counts"))
+exprs_norm <- predict(vsn_fit, assay(se, "counts"))
+
+# Add normalized data as an additional assay
+assay(se, "vsn") <- exprs_norm
+se_norm <- se
+
+# Convert matrix to MSnSet
+msnset <- MSnSet(
+  exprs = exprs_norm,
+  phenoData = AnnotatedDataFrame(sample_annotation)
+)
 
 # Impute missing values using KNN
-se_imp_knn <- impute(se_norm, fun = "knn") # 563 rows with more than 50 % entries missing; mean imputation used for these rows
+msnset_imputed <- impute(msnset, method = "knn")
 
 
 #   ### 6. 🧪 Protein Inference & Quantification
@@ -319,20 +291,18 @@ se_imp_knn <- impute(se_norm, fun = "knn") # 563 rows with more than 50 % entrie
 #   - Log2 fold-change
 # - Adjusted p-value (e.g., FDR < 0.05)
 
+library(dplyr)
 library(limma)
-library(SummarizedExperiment)
 
-# Extract normalized, imputed expression matrix
-exprs_mat <- assay(se_imp_knn)
+exprs_mat <- assay(se_imp_knn, "vsn_imputed")
 
-# Extract sample group information
+# Extract sample metadata
 sample_info <- colData(se_imp_knn)
-group <- factor(sample_info$condition)
 
-# Create design matrix for the comparison (e.g., flg vs mock)
-design <- model.matrix(~ 0 + group)
-colnames(design) <- levels(group)
-design
+# Create design matrix for the comparison (flg vs mock)
+condition <- factor(sample_info$condition)
+design <- model.matrix(~ 0 + condition)
+colnames(design) <- levels(condition)
 
 # Fit the model
 fit <- lmFit(exprs_mat, design)
@@ -340,7 +310,6 @@ fit <- lmFit(exprs_mat, design)
 # Create contrast (e.g., flg vs mock)
 contrast_matrix <- makeContrasts(FLGvsMOCK = flg - mock, levels = design)
 
-# Apply contrast to model
 fit2 <- contrasts.fit(fit, contrast_matrix)
 fit2 <- eBayes(fit2)
 
@@ -362,8 +331,10 @@ head(sig_proteins)
 # - Heatmaps  
 # - Use packages such as `ggplot2`, `DEP`, or `limma`
 
+library(dplyr)
 library(ggplot2)
 library(ggrepel)
+library(pheatmap)
 
 # Run PCA on transposed expression matrix
 pca <- prcomp(t(exprs_mat), scale. = TRUE)
@@ -391,8 +362,7 @@ ggplot(pca_df, aes(x = PC1, y = PC2, color = condition, label = replicate)) +
     y = paste0("PC2 (", pca_var_percent[2], "%)")
   )
 
-library(pheatmap)
-
+# Visualize results in heatmap
 top_proteins <- results %>%
   dplyr::filter(adj.P.Val < 0.05 & abs(logFC) > 1) %>%
   dplyr::arrange(adj.P.Val) %>%
@@ -424,9 +394,7 @@ pheatmap(heatmap_mat_scaled,
 # - Number of peptides and proteins
 # - Key figures or results (if available)
 # - Comments on reproducibility
-# 
-# ---
-#   
+
 #   ### 10. 📝 Final Report & Interpretation  
 #   **Goal:** Reflect on your analysis  
 # ↓  
