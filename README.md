@@ -1,4 +1,7 @@
 <p align="center">
+  <img src="t shirt final logo.png" alt="Project Logo" width="200"/>
+</p>
+<p align="center">
   <img src="t shirt final logo - black (2).jpg" alt="Project Logo" width="200"/>
 </p>
 
