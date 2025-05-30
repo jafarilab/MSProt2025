@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="t shirt final logo (2).pdf" alt="Project Logo" width="200"/>
+  <img src="t shirt final logo - black (2).jpg" alt="Project Logo" width="200"/>
 </p>
 
 <h1 align="center">MS-PROT 2025</h1>
