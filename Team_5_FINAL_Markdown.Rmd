@@ -1,0 +1,617 @@
+---
+title: "Team_5_rmd"
+output: html_document
+date: "2025-05-31" 
+editor_options: 
+  markdown: 
+    wrap: 72
+  chunk_output_type: inline
+---
+
+# Libraries
+
+```{r setup, include=TRUE, echo=TRUE, eval=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+install.package("BiocManager")
+library(BiocManager)
+
+##Bioconductor packages
+if (!requireNamespace("BiocManager", quietly = TRUE))
+     install.packages("BiocManager")
+ 
+BiocManager::install("tidyverse")
+BiocManager::install("factoextra")
+BiocManager::install("msdata")
+BiocManager::install("mzR")
+BiocManager::install("rhdf5")
+BiocManager::install("rpx")
+BiocManager::install("R.utils")
+BiocManager::install("MsCoreUtils")
+BiocManager::install("QFeatures")
+BiocManager::install("Spectra")
+BiocManager::install("ProtGenerics")
+BiocManager::install("PSMatch")
+BiocManager::install("pheatmap")
+BiocManager::install("limma")
+BiocManager::install("MSnID")
+BiocManager::install("RforMassSpectrometry/SpectraVis")
+ 
+install.packages("tidyverse")
+```
+
+# 1. 📁 Dataset Acquisition
+
+```{r}
+# Data assessment
+library("rpx")
+px <- PXDataset("PXD058779")
+px
+all_files <- pxfiles(px)
+print(all_files)
+
+#f <- pxget(px, grep("mzid", pxfiles(px))) #mzID files only
+mzid_files <- grep("mzid\\.gz$", pxfiles(px), value = TRUE)
+f <- pxget(px, mzid_files)
+f
+library(R.utils)
+# Unzip all .gz files
+unzipped_files <- sapply(f, function(file) {
+  if (grepl("\\.gz$", file)) {
+    gunzip(file, overwrite = TRUE, remove = FALSE)  # set remove = TRUE if you want to delete .gz files
+  } else {
+    file  # if not gzipped, just return the original file
+  }
+})
+
+# Print list of unzipped files
+print(unzipped_files)
+```
+
+# 2. 🧱 PSM Object Creation & Preprocessing
+
+```{r}
+#using the PSM function from R.utils package
+library(R.utils) #R.utils v2.13.0
+library(MSnID)
+# Convert all unzipped .mzid files into PSM objects
+psm1 <- PSMatch::PSM("/Users/swethaanatraj/Library/Caches/org.R-project.R/R/rpx/49a16a6c055c_F01_CF_20220218.mzid")
+#Error in finding PSM function.. 
+ls("package:rpx")
+ls("package:R.utils")
+```
+
+ls("package:rpx") Not able to get PSM function exported from rpx
+package...
+
+[1] "fileTypes" "pxannounced" "pxCachedProjects" "pxCacheInfo"
+"PXDataset"\
+[6] "PXDataset1" "PXDataset2" "pxfiles" "pxFileTypes" "pxget"\
+[11] "pxid" "pxinstruments" "pxprotocols" "pxptms" "pxPublicationDate"
+
+[16] "pxref" "pxSubmissionDate" "pxtax" "pxtitle" "pxurl"\
+[21] "rpxCache" "show" "updatePxFileTypes"
+
+| Column Name                                                          | Description                                                                                            |
+|-----------------------------|-------------------------------------------|
+| `pepseq`                                                             | **Peptide sequence** (main sequence you want to identify)                                              |
+| `accession`                                                          | **Protein ID** (e.g., UniProt ID) that the peptide maps to                                             |
+| `spectrumid` / `acquisitionnum`                                      | Identifies the spectrum (scan) used to match this peptide                                              |
+| `rank`                                                               | Ranking of the match (1 = best scoring)                                                                |
+| `MS.GF.QValue` *(in some datasets)* or `progenesis:confidence score` | Statistical confidence. Lower Q-value = more confident match                                           |
+| `isDecoy`                                                            | Indicates whether the match was to a decoy protein (helps estimate FDR) — **all `FALSE` in your case** |
+| `modification`, `modified`                                           | Whether the peptide has PTMs (post-translational modifications)                                        |
+| `start`, `end`, `pre`, `post`                                        | Peptide position in the protein and flanking residues                                                  |
+| `idFile`, `spectrumFile`                                             | Metadata about which input file this PSM came from                                                     |
+
+```{r}
+# Load required package
+library(mzID)
+psm_list <- lapply(f, function(file) {
+  mzid_obj <- mzID(file)
+  flatten(mzid_obj)
+})
+
+# Combine all PSM tables into one dataframe
+psm_all <- do.call(rbind, psm_list)
+
+#Check structure
+str(psm_all)
+head(psm_all)
+colnames(psm_all)
+```
+
+## Calculating the % of PSMs, unique peptides, unique proteins for each spectrum file and plotting it
+
+```{r}
+library(data.table)
+library(ggplot2)
+
+# Convert to data.table (if not already)
+psm_dt <- as.data.table(psm_all)
+
+# Summary stats per file
+summary_dt <- psm_dt[, .(
+  Total_PSMs = .N,
+  Unique_Peptides = uniqueN(pepseq),
+  Unique_Proteins = uniqueN(accession)
+), by = spectrumFile]
+
+# Add percentage columns
+summary_dt[, `:=`(
+  PSMs_pct = Total_PSMs / sum(Total_PSMs) * 100,
+  Peptides_pct = Unique_Peptides / sum(Unique_Peptides) * 100,
+  Proteins_pct = Unique_Proteins / sum(Unique_Proteins) * 100
+)]
+
+# Reshape to long format for ggplot
+plot_dt <- melt(summary_dt[, .(spectrumFile, PSMs_pct, Peptides_pct, Proteins_pct)],
+                id.vars = "spectrumFile",
+                variable.name = "Metric", value.name = "Percentage")
+
+# Clean up metric names
+plot_dt[, Metric := gsub("_pct", "", Metric)]
+
+```
+
+```{r}
+# Create short labels
+short_labels <- c("F01", "F02", "F03", "F04")
+names(short_labels) <- unique(plot_dt$spectrumFile)
+
+# Replace with short names
+plot_dt[, spectrumFile := short_labels[spectrumFile]]
+
+library(RColorBrewer)
+ggplot(plot_dt, aes(x = spectrumFile, y = Percentage, fill = Metric)) +
+  geom_col(position = "dodge") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Percentage Distribution by Spectrum File",
+       x = "Spectrum File", y = "Percentage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+```
+
+## Checking for Decoys
+
+```{r}
+# Count decoy hits
+table(psm_all$isDecoy)
+#FALSE 
+#1213280 
+
+#To infer decoys manually from protein accessions
+#If the decoy proteins follow a naming pattern like "DECOY_", "REV_", "XXX_", etc., we can generate a flag:Create isDecoy column manually (example: "XXX_" used as decoy prefix)
+psm_all$isDecoy <- grepl("^XXX_|^DECOY_|^REV_", psm_all$accession)
+table(psm_all$isDecoy)
+# FALSE 1213280 
+
+#What this tells us: All PSMs are marked as FALSE for isDecoy No decoy hits are present (or were not included by the search engine)
+```
+
+The .mzID files we are working with do not contain a isDecoy column. Why
+is isDecoy missing?
+
+Answer: The isDecoy column is not guaranteed to be in every .mzID file.
+It depends on: Whether the original search engine added decoy
+annotations, Whether the mzID parser found and retained them. In our
+case, flatten() produced a 24-column dataframe but no isDecoy field.
+
+Next steps,
+
+To check the distribution of confidence score on a histogram
+
+```{r}
+ggplot(psm_all, aes(x = `progenesis:confidence score`)) +
+  geom_histogram(bins = 50)
+```
+
+### What are the progenesis:confidence score=0 PSMs?
+
+### These could be:
+
+1.  **Failed identifications** (PSMs matched with extremely poor
+    confidence)
+
+2.  **Decoys that were not labeled as decoys** — especially if your
+    software didn’t mark them explicitly (e.g., missing “reverse” or
+    “decoy” tags).
+
+3.  **Artifact entries** (sometimes low-score hits if score calculation
+    failed).
+
+```{r}
+library(data.table)
+psm_all <- as.data.table(psm_all)
+
+zero_conf <- psm_all[get("progenesis:confidence score") == 0]
+
+nrow(zero_conf) #There are 56538 0 scored counts
+
+table(zero_conf$spectrumFile)
+#F1 21334
+#F2 9679
+#F3 15793
+#F4 9732
+
+short_labels <- c("F01", "F02", "F03", "F04")
+# Map the actual long names to short labels
+# Make sure the order matches your files exactly
+long_names <- unique(psm_all$spectrumFile)
+names(short_labels) <- long_names
+
+# Replace long names with short labels in the data
+psm_all$spectrumFile <- short_labels[psm_all$spectrumFile]
+
+ggplot(psm_all, aes(x = `progenesis:confidence score`, fill = spectrumFile)) +
+  geom_histogram(position = "identity", bins = 50, alpha = 0.6) +
+  labs(title = "Confidence Score Distribution by Spectrum File",
+       x = "Progenesis: Confidence Score", y = "Count") +
+  theme_minimal()
+
+
+```
+
+To check if the 0 scored ones have hints of being Decoy in the data,
+having labels like REV, DECOY in the names..
+
+```{r}
+table(zero_conf$accession)[1:20] 
+#NO..
+#A0AVT1 A0FGR8 A0FGR9 A0PJY2 A1A4S6 A1L0T0 A2A368 A2IDD5 A2RRP1 A2RU49 A2RUR9 A2VDF0 A2VDJ0 
+ #   1      1      1      1      3      1      2
+```
+
+The 0 scored PSMs are not labelled with Decoy hints. They can be 0 for
+the following reasons:
+
+-   **They’re real IDs**, but the identifications were **very poor
+    (score = 0)** — and likely false positives
+
+-   **The search engine didn’t include decoys** or **didn’t label them**
+    in the output..
+
+```{r}
+#To check how many PSMs exist for each of these proteins overall
+psm_all[accession %in% names(table(zero_conf$accession)), 
+        .N, by = .(`progenesis:confidence score`, accession)]
+
+#Do they have peptide sequences?
+unique(zero_conf$pepseq)
+#Yes, ~8000 but ... they seem to be short sequences?
+```
+
+```{r}
+zero_conf$pep_length <- nchar(zero_conf$pepseq)
+library(data.table)
+zero_conf_dt <- as.data.table(zero_conf)
+
+length_counts <- zero_conf_dt[, .N, by = pep_length][order(pep_length)]
+library(ggplot2)
+
+ggplot(length_counts, aes(x = pep_length, y = N)) +
+  geom_col(fill = "#1f78b4") +
+  labs(title = "Peptide Length Distribution (Score = 0 Hits)",
+       x = "Peptide Length (Number of AAs)",
+       y = "Count") +
+  theme_minimal()
+
+```
+
+Let's compare this with the peptide lengths of high confidence score
+PSMs!
+
+```{r}
+# For comparison: high-confidence PSMs
+high_conf <- psm_all[`progenesis:confidence score` > 5]
+high_conf$pep_length <- nchar(high_conf$pepseq)
+high_dt <- as.data.table(high_conf)
+high_len_counts <- high_dt[, .N, by = pep_length][order(pep_length)]
+high_len_counts$type <- "High Score"
+
+# Add low-confidence (score = 0)
+zero_len_counts <- zero_conf_dt[, .N, by = pep_length][order(pep_length)]
+zero_len_counts$type <- "Score 0"
+
+# Combine both
+len_plot_dt <- rbind(high_len_counts, zero_len_counts)
+
+# Plot comparison
+ggplot(len_plot_dt, aes(x = pep_length, y = N, fill = type)) +
+  geom_col(position = "dodge") +
+  labs(title = "Peptide Length Distribution: Score 0 vs High Confidence",
+       x = "Peptide Length", y = "Count", fill = "PSM Type") +
+  theme_minimal()
+
+```
+
+## Conclusion about Decoys:
+
+##### 1. PSMs with a confidence score of 0 are not labeled as 'decoys'
+
+##### 2. Score = 0 PSMs are dominated by short peptides. These short sequences are: Often non-unique, Poorly fragmented in MS/MS and not reliable for confident protein identification
+
+##### 3. High-confidence PSMs show expected length distribution: Their distribution peaks between 10–20 amino acids — typical of good-quality, proteotypic peptides.
+
+##### This is strong evidence that score = 0 hits are likely false positives or low-information matches, even if not formally labeled as decoys.
+
+Next steps...
+
+To filter based on 1. rank and 2. FDR or identification score..
+
+```{r}
+table(psm_all$rank) #There is only Rank 1 in our data 
+#  1 
+#1213280 
+```
+
+```{r}
+# To filter only confident PSMs
+psm_filtered <- subset(psm_all,
+                       `progenesis:confidence score` > 5)
+
+```
+
+```{r}
+library(data.table)
+library(ggplot2)
+
+# Convert to data.table (if not already)
+psm_dt <- as.data.table(psm_filtered)
+
+# Summary stats per file
+summary_dt <- psm_dt[, .(
+  Total_PSMs = .N,
+  Unique_Peptides = uniqueN(pepseq),
+  Unique_Proteins = uniqueN(accession)
+), by = spectrumFile]
+
+# Add percentage columns
+summary_dt[, `:=`(
+  PSMs_pct = Total_PSMs / sum(Total_PSMs) * 100,
+  Peptides_pct = Unique_Peptides / sum(Unique_Peptides) * 100,
+  Proteins_pct = Unique_Proteins / sum(Unique_Proteins) * 100
+)]
+
+# Reshape to long format for ggplot
+plot_dt <- melt(summary_dt[, .(spectrumFile, PSMs_pct, Peptides_pct, Proteins_pct)],
+                id.vars = "spectrumFile",
+                variable.name = "Metric", value.name = "Percentage")
+plot_dt <- as.data.table(plot_dt)
+
+# Clean up metric names
+plot_dt[, Metric := gsub("_pct", "", Metric)]
+
+```
+
+```{r}
+# Create short labels
+short_labels <- c("F01", "F02", "F03", "F04")
+names(short_labels) <- unique(plot_dt$spectrumFile)
+
+# Replace with short names
+plot_dt[, spectrumFile := short_labels[spectrumFile]]
+
+library(RColorBrewer)
+ggplot(plot_dt, aes(x = spectrumFile, y = Percentage, fill = Metric)) +
+  geom_col(position = "dodge") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Percentage Distribution after filtering PSMs",
+       x = "Spectrum File", y = "Percentage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+# 3. 🧬 Protein & Peptide Identification
+
+```{r}
+library("PSMatch")
+names(psm_all)
+library(Biostrings)
+fasta <- readAAStringSet("~/Downloads/UP000005640_9606.fasta") #20647 proteins
+unique_peps <- unique(psm_filtered$pepseq)
+```
+
+## Making an adjacency matrix
+
+```{r}
+# Make sure you have a clean peptide-protein mapping table
+peptide_protein_df <- unique(psm_filtered[, c("pepseq", "accession")])
+
+# Rename columns to match expected format
+colnames(peptide_protein_df) <- c("sequence", "DatabaseAccess")
+
+prots <- peptide_protein_df$DatabaseAccess
+names(prots) <- peptide_protein_df$sequence
+m <- makeAdjacencyMatrix(prots)
+m[]
+dim(m)
+m[1:5, 1:5]
+
+#This matrix models the relation between the 72527 peptides and the 5907 is the identification data. These numbers can be verified by checking the number of unique peptides sequences and database accession numbers.
+length(unique(peptide_protein_df$sequence))
+length(unique(peptide_protein_df$DatabaseAccess))
+```
+
+## Connected Components generation
+
+```{r}
+#Now, we will make a subset of this matrix by connecting proteins with defined set of peptides by using the ConnectedComponents function
+cc <- ConnectedComponents(m)
+length(cc) #3172 connected components
+#connectedComponents(cc, 459)
+dims(cc)
+```
+
+#### cc
+
+#### Number of proteins: 5907
+
+#### Number of components: 3172
+
+#### Number of components [peptide x peptides]:
+
+#### 820[1 x 1] 22[1 x n] 2063[n x 1] 267[n x n]
+
+To include only those connected components which have more than 2
+peptides for each protein (as shown in the paper)
+
+```{r}
+# Suppose you already have dims as a matrix:
+component_dims <- dims(cc)
+
+# 1. Count how many components have >2 peptides
+sum(component_dims[, 1] > 2) #1750 components have atleast more than 2 peptides connected to a protein 
+
+# 2. Get the indices of those components
+interesting_idx <- which(component_dims[, 1] > 2)
+
+# 3. Extract those components
+cc_filtered <- cc[interesting_idx]
+
+
+```
+
+To rank and check the CC via a PCA Biplot
+
+```{r}
+head(cctab <- prioritiseConnectedComponents(cc_filtered))
+library(factoextra)
+fviz_pca(prcomp(cctab, scale = TRUE, center = TRUE))
+
+#793 is a clear outlier 
+#To remove the outliers and make a new filtered data 
+
+# Indices of outlier components to exclude (based on the PCA plot)
+outliers <- c(793, 1006)
+
+# Filter out unwanted components
+cc_filtered@adjMatrices <- cc_filtered@adjMatrices[-outliers]
+# 0[1 x 1] 0[1 x n] 1496[n x 1] 252[n x n] so the outliers were the ones that were n x n 
+```
+
+#### To arrange the filtered components and check details for apoE protein
+
+```{r}
+# Extract list of matrices (components)
+mat_list <- cc_filtered@adjMatrices
+match_idx <- which(sapply(mat_list, function(mat) {
+  "P02649" %in% colnames(mat)
+}))
+
+
+# If found:
+if (length(match_idx) > 0) {
+  comp <- mat_list[[match_idx]]
+
+  # Peptides connected to P02649
+  connected_peptides <- rownames(comp)[comp[, "P02649"] != 0]
+
+  # View as a table
+  result <- data.frame(protein = "P02649", peptide = connected_peptides)
+  print(result)
+} else {
+  message("P02649 not found in any filtered component.")
+}
+```
+
+# 4. 🔄 QFeature Aggregation (Optional)
+
+## Our current data is identification-only: it tells what was found, not how much was found
+
+#### If we could combine our analysed PSM data with known quantitative data, then we would be able to proceed. Due to a halt in our analysis, we contacted the authors for the converted quant files, and proceeded with our analysis. 
+
+#### They provided us three files: 
+
+1.  Peptide measurements
+2.  Protein measurements
+3.  Peptide ion meaurements
+
+#### Below we show the code for working with peptide measurements. 
+
+#### NOTE: The counts are already normalised, hence Step 5 is not required in our case. 
+
+```{r}
+library(readxl)
+colData <- read_excel("~/Downloads/quant_colData.xlsx")
+Counts <- read_excel("~/Downloads/Peptide_qaunt.xlsx")
+```
+
+```{r}
+library("QFeatures")
+Counts[[1]]
+Counts[["Sequence"]]
+```
+
+```{r}
+library(QFeatures)
+library(SummarizedExperiment)
+library(tibble)
+library(dplyr)
+library(MultiAssayExperiment)
+
+# 1. Selecting columns from the Counts file
+intensity_cols <- c("DSAD1", "DSAD2", "DSAD3", "DSAD4", "DSAD5", "DSAD6", 
+                    "DSAD7", "DSAD8", "EOAD1", "EOAD2", "EOAD3", 
+                    "HA1", "HA2", "HA3", "HA4")
+
+# 2. Extracting expression matrix
+quant <- as.matrix(Counts[, intensity_cols])
+rownames(quant) <- Counts$ID  # use ID column (must be unique)
+
+# 3. Building rowData (peptide annotations)
+row_data <- DataFrame(
+  peptide = Counts$Sequence,
+  protein = Counts$Accession,
+  row.names = Counts$ID
+)
+
+# 4. Checking for colData (sample annotations)
+col_data <- as.data.frame(colData)
+rownames(col_data) <- col_data$Sample
+col_data <- col_data[intensity_cols, , drop = FALSE]  
+
+# 5. Creating SummarizedExperiment
+se <- SummarizedExperiment(
+  assays = list(peptide = quant),
+  rowData = row_data,
+  colData = col_data
+)
+
+
+# 6. Creating QFeatures object
+qf <- QFeatures(list(peptide = se))
+assayNames(qf)
+
+qf <- aggregateFeatures(
+  qf,
+  i = "peptide",
+  fcol = "protein",   # <- this must match your rowData column name
+  name = "protein",
+  fun = colMedians
+)
+head(rowData(qf[["peptide"]]))
+names(qf)
+
+qf[["protein"]]             # It is the SummarizedExperiment for proteins
+assay(qf[["protein"]])      # It is the Protein quant matrix
+
+```
+
+To check how many peptide match to ApoE protein
+
+```{r}
+pep_metadata <- rowData(qf[["peptide"]])
+sum(pep_metadata$protein == "P02649")
+pep_metadata$peptide[pep_metadata$protein == "P02649"]
+#64 It is the same number of peptides that the authors mentioned in the paper
+```
+
+```{r}
+#Saving the quant file 
+protein_matrix <- assay(qf[["protein"]])
+write.csv(protein_matrix, "~/Documents/Personal/Files_to_transfer/Proteomics_Course _2025/Team5/team5_prot/MSProt2025/protein_quant.csv")
+
+#This file will be further analysed in OmicsQ for sample clustering, outlier expression check and differential anlaysis!
+#Only default settings in OmicsQ were used for analysis. 
+```
