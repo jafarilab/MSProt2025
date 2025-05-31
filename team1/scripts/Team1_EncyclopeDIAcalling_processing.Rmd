@@ -17,6 +17,12 @@ library(readr)
 library(stringr)
 library(RSQLite)
 library(DBI)
+library(QFeatures)
+library(tidyverse)
+library(stringr)
+library(ggpubr)
+library(msqrob2)
+library(factoextra)
 ```
 
 ```{r setup, include=FALSE}
@@ -64,36 +70,38 @@ mzmlFiles <-  list.files(path="/Users/castleti/Library/Caches/org.R-project.R/R/
                         pattern = "*.mzML$",
                         full.names = TRUE)
 
-for (mzml in mzmlFiles){
-  outFile <- file.path(output_dir, paste0(basename(tools::file_path_sans_ext(mzml))))
-
-  cmd <- paste("java -Xmx20G -jar", encyclopeDIA_jar,
-             "-l", libraryFile,
-             "-i", mzml,
-             "-f", ref)
-  cat("Running:", mzml, "\n")
-  # Run
-  #system(cmd)
-} 
-# This outputs several files, among which are graphs that serve as QC. This only identifies peptides / proteins but does not provide quantification results that can be used to comparae between samples (since it is a DIA experiment, the quantification engine chooses the best ions from each sample for quantification and it does not make sense to do it per sample because the best ion might differ from sample to sample)
+## Uncomment to run, takes ~2 h per file 
+# for (mzml in mzmlFiles){
+#   outFile <- file.path(output_dir, paste0(basename(tools::file_path_sans_ext(mzml))))
+# 
+#   cmd <- paste("java -Xmx20G -jar", encyclopeDIA_jar,
+#              "-l", libraryFile,
+#              "-i", mzml,
+#              "-f", ref)
+#   cat("Running:", mzml, "\n")
+#   # Run
+#   #system(cmd)
+# } 
+## This outputs several files, among which are graphs that serve as QC. This only identifies peptides / proteins but does not provide quantification results that can be used to comparae between samples (since it is a DIA experiment, the quantification engine chooses the best ions from each sample for quantification and it does not make sense to do it per sample because the best ion might differ from sample to sample)
 
 ```
 
 
 To run Encyclopedia to generate global quantitative results 
 ```{r}
-cmd <- paste("java -Xmx12G -jar", encyclopeDIA_jar,
-             "-l", libraryFile,
-             "-i", "~/Desktop/Proteomics/CapstoneProjectTeam1/data/results/encyclopeDIA_out/",
-             "-f", ref,
-             "-libexport",
-             "-a true",
-             "-o ~/Desktop/Proteomics/CapstoneProjectTeam1/data/results/encyclopeDIA_out/output.elib")
-  
-
-  #cat("Running:", mzml,"\n")
-  # Run
-system(cmd)
+## Uncoment to run 
+# cmd <- paste("java -Xmx12G -jar", encyclopeDIA_jar,
+#              "-l", libraryFile,
+#              "-i", "~/Desktop/Proteomics/CapstoneProjectTeam1/data/results/encyclopeDIA_out/",
+#              "-f", ref,
+#              "-libexport",
+#              "-a true",
+#              "-o ~/Desktop/Proteomics/CapstoneProjectTeam1/data/results/encyclopeDIA_out/output.elib")
+#   
+# 
+#   #cat("Running:", mzml,"\n")
+#   # Run
+# system(cmd)
 ```
 
 
@@ -106,16 +114,13 @@ output_concatenated <- read.table("~/Desktop/Proteomics/CapstoneProjectTeam1/dat
 colnames(output_concatenated) 
 ```
 
-The output of encyclopeDIA does not provide a rank. Because this is a DIA tool, ranking is not performed in the same way that DDA search engines do. Additionally, Encyclopedia outputs the feature table for the decoys in a separate file. 
-To go on with the tasks, we are going to combine the feature table containing the target PSMs with the decoy hits - to calculate PSMs FDR.
-
-Create PSM object from EncyclopeDIA .tsv files: 
+Glimpse at the output elib files
 ```{r}
 elibFile <- "data/results/encyclopeDIA_out/bde162c4da2_Tsiokas_111622_Sample_17_Clone7_expt2.mzML.elib"
 
-con <- dbConnect(RSQLite::SQLite(), elibFile)
+#con <- dbConnect(RSQLite::SQLite(), elibFile)
 
-dbListTables(con)
+#dbListTables(con)
 ```
 
 ```{r}
@@ -126,14 +131,18 @@ str(precursors)
 head(precursors)
 ```
 
+Create PSM object from EncyclopeDIA .tsv files: 
 ```{r}
 # list feature files
-targetFiles_fromEncyclopeDIA <- list.files("data/results/encyclopeDIA_out", pattern = "*features.txt$", full.names = T)
-decoyFiles_fromEncyclopeDIA <- list.files("data/results/encyclopeDIA_out/", pattern = "*encyclopedia.decoy.txt", full.names = T)
+#data/results/encyclopeDIA_out
+targetFiles_fromEncyclopeDIA <- list.files("~/Desktop/Proteomics/CapstoneProjectTeam1/data/results/encyclopeDIA_out/", pattern = "*features.txt$", full.names = T)
+# decoyFiles_fromEncyclopeDIA <- list.files("data/results/encyclopeDIA_out/", pattern = "*encyclopedia.decoy.txt", full.names = T)
 
 #df <- read_table("data/results/encyclopeDIA_out/bde162c4da2_Tsiokas_111622_Sample_17_Clone7_expt2.mzML.encyclopedia.txt")
-# First, we combined all files into 1 data frame
+# Do not take the output file that contains the integated analysis
+targetFiles_fromEncyclopeDIA <- targetFiles_fromEncyclopeDIA[grep("output", targetFiles_fromEncyclopeDIA, invert = T)]
 
+# First, we combined all files into 1 data frame
 all_feat <- lapply(targetFiles_fromEncyclopeDIA, function(f){
   df <- read_table(f)
   source_file <- basename(f)
@@ -216,8 +225,6 @@ table(psm_data$isDecoy)
 
 Plot score distribution before rank filtering
 ```{r}
-library(ggplot2)
-
 ggplot(psm_data, aes(x = score, fill = isDecoy))  +  
   scale_fill_manual(values = c("lightgray","#F59CA9")) +
   geom_histogram(alpha = 0.8) + 
@@ -299,7 +306,7 @@ n_target <- n_total - n_decoy
 peptide_df <- data.frame(
   peptide = filt_psm$sequence,
   charge = filt_psm$charge
-)
+) 
 n_unique_peptides <- n_distinct(paste(peptide_df$peptide, peptide_df$charge, sep = "_"))
 
 # Unique proteins
@@ -348,8 +355,6 @@ There are no protein groups identified by a single peptide
 
 Protein groups (proteins that share the same peptide matches)
 ```{r}
-library(stringr)
-
 psm_data_ranked <- psm_data_ranked %>%
   ungroup() %>% 
   mutate(ProteinsList = str_split(accession, ";"),
@@ -395,13 +400,19 @@ cat("Unique razor proteins:", length(unique(psm_data_ranked$RazorProtein)), "\n"
 ```
 
 Peptide-level data processing, protein aggregation and DEA
-```{r}
-library(QFeatures)
-library(tidyverse)
 
+Retrieve files exported from output.elib 
+```{r}
 quant <- read_csv("~/Desktop/Proteomics/CapstoneProjectTeam1/peptidequants.csv")
 pep_to_prot <- read_csv("~/Desktop/Proteomics/CapstoneProjectTeam1/peptidetoprotein.csv")
+
+# Filter out decoys keps in these files
+pep_to_prot <- pep_to_prot %>% 
+  filter(isDecoy == 0)
+
 table(quant$SourceFile)
+
+
 
 # To check that all peptides identified in every sample
 quant %>% 
@@ -420,9 +431,8 @@ nest_prot <- pep_to_prot %>%
   select(-c("isDecoy", "ProteinAccession"))
 
 # merge with peptide to protein 
-quant_prot <- left_join(quant, nest_prot, by = "PeptideSeq") %>% 
+quant_prot <- inner_join(quant, nest_prot, by = "PeptideSeq") %>% 
   filter(!is.na(Proteins))
-
 
 table(quant_prot %>% duplicated())
 
@@ -448,14 +458,14 @@ nna
 ```
 
 ```{r}
-rm(psm_se_filtered)
+#rm(psm_se_filtered)
 psm_se_filtered = filterNA(psm_se, 0.2, i=1) # kept every peptide with less than 20% missing data
 
 nna = nNA(psm_se_filtered, 1)
 nna
 ```
 
-```{r}
+```{r, warning=FALSE}
 ## Norm
 # First impute missing data
 psm_se_filtered <- QFeatures::impute(psm_se_filtered, method = "knn", i = "peptides", name = "imputed_peptides")
@@ -469,8 +479,13 @@ assay(psm_se_filtered, i = "log_peptides") %>%
   pivot_longer(cols = everything(), names_to = "File", values_to = "Intensity") -> t_psm
 
 ggplot(t_psm, aes(x = as.factor(File), y = Intensity, fill = "File")) + 
-  geom_boxplot(outliers = T)
-
+  scale_fill_manual(values = "#C0E0DE") + 
+  geom_boxplot(outliers = T) + 
+  theme_minimal() + 
+  theme(aspect.ratio = 1,
+        axis.text.x = element_blank(),
+        legend.position ="none") + 
+  xlab("") -> g_before
 limma::plotDensities(assay(psm_se_filtered[["log_peptides"]]))
 
 # Check different norm methods 
@@ -518,10 +533,9 @@ ggplot(t_psm_vsn, aes(x = as.factor(File), y = Intensity, fill = "File")) +
         legend.position = element_blank()) + 
   xlab("") -> g_vsn
 
-library(ggpubr)
-pdf("norm_plots.pdf", height = 4, width = 8)
-ggarrange(g_mean , g_median, ncol = 2) # keep median
-dev.off()
+#pdf("../../../../CapstoneProjectTeam1/norm_plots.pdf", height = 4, width = 10)
+ggarrange(g_before, g_mean , g_median, ncol = 3) # keep median
+#dev.off()
 
 # Protein aggrgation on normalised peptides 
 qf_prot <- aggregateFeatures(
@@ -532,7 +546,7 @@ qf_prot <- aggregateFeatures(
   fun   = MsCoreUtils::robustSummary
 )
 
-limma::plotDensities(assay(qf_prot[["norm_center_median_log"]]), legen =F)
+limma::plotDensities(assay(qf_prot[["peptides"]]), legen =F)
 
 ```
 
@@ -570,15 +584,14 @@ table(conditions)
 colData(qf_prot) <- conditions
 ```
 
-
 DE analysis
 ```{r}
-library(msqrob2)
-
-pdf("norm_center_median_log_densities.pdf", height = 5, width = 5)
+#pdf("norm_center_median_log_densities.pdf", height = 5, width = 5)
 limma::plotDensities(assay(qf_prot[["norm_center_median_log"]]), legend = F)
-dev.off()
+#dev.off()
 ```
+
+Plot multidimensional summary
 ```{r}
 colors <- case_when(
     str_detect(string = rownames(conditions), pattern = "EV") ~ "black",
@@ -586,19 +599,34 @@ colors <- case_when(
     TRUE ~ "red"
   )
 
-pdf("mds_pep.pdf", height = 6, width = 6)
+#pdf("mds_pep.pdf", height = 6, width = 6)
 limma::plotMDS(assay(qf_prot[["norm_center_median_log"]]), col=colors)
-dev.off()
+#dev.off()
+```
+
+Plot PCA results
+```{r}
+pca_prot <-
+    qf_prot[["proteins"]] %>%
+    filterNA() %>%
+    assay() %>%
+    t() %>%
+    prcomp(scale = TRUE, center = TRUE) %>%
+    fviz_pca_ind(habillage = qf_prot$condition,
+                 title = "Proteins (robustSummary aggregation)",palette = c("#8DDCA4", "#413C58"))
+
+#pdf("pca_proteins.pdf", height = 6, width = 6)
+pca_prot
+#dev.off()
 ```
 
 ```{r}
-pdf("mds_prot.pdf", height = 6, width = 6)
+#pdf("mds_prot.pdf", height = 6, width = 6)
 limma::plotMDS(assay(qf_prot[["proteins"]]), col = colors)
-dev.off()
+#dev.off()
 ```
-We could consider removing the outlier sample
 
-```{r}
+```{r, warning=FALSE}
 qf_prot <- msqrob(object = qf_prot, i = "proteins", formula = ~condition, overwrite =T)
 ```
 
@@ -634,7 +662,7 @@ res_df <- rowData(qf_prot[["proteins"]])$conditionWT
 
 res_df
 
-rownames(res_df)
+#rownames(res_df)
 
 grep("*Q3V0J1*", rownames(res_df)) -> check
 
@@ -648,9 +676,9 @@ sigNames <- rowData(qf_prot[["proteins"]])$conditionWT %>%
     filter(adjPval < 0.05) %>%
     pull(proteins)
 
-pdf("heatmap.pdf", width = 9, height = 6)
+#pdf("heatmap.pdf", width = 9, height = 6)
 heatmap(assay(qf_prot[["proteins"]])[sigNames, ])
-dev.off()
+#dev.off()
 ```
 
 Get results table from PRIDE
