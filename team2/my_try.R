@@ -120,7 +120,7 @@ ggplot(nc_maxquant_fil, aes(x = `Score`)) +
 
 
 #filtering based on score >10
-high_conf_maxquant <- subset(nc_maxquant_fil, `Score` > 10)
+high_conf_maxquant <- subset(nc_maxquant_fil, ((`Q.value` < 0.01) & (`Score`>10)))
 
 #without filtering
 high_conf_maxquant1 <- nc_maxquant_fil
