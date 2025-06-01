@@ -10,30 +10,30 @@
 #   
 #   ### 1. 📁 Dataset Acquisition  
 
-install.packages("BiocManager")
-
-library(BiocManager)
-
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-
-BiocManager::install("tidyverse")
-BiocManager::install("factoextra")
-BiocManager::install("msdata")
-BiocManager::install("mzR")
-BiocManager::install("rhdf5")
-BiocManager::install("rpx")
-BiocManager::install("MsCoreUtils")
-BiocManager::install("QFeatures")
-BiocManager::install("Spectra")
-BiocManager::install("ProtGenerics")
-BiocManager::install("PSMatch")
-BiocManager::install("pheatmap")
-BiocManager::install("limma")
-BiocManager::install("MSnID")
-BiocManager::install("remotes")
-BiocManager::install("RforMassSpectrometry/SpectraVis")
-BiocManager::install("Biostrings")
+# install.packages("BiocManager")
+# 
+# library(BiocManager)
+# 
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("tidyverse")
+# BiocManager::install("factoextra")
+# BiocManager::install("msdata")
+# BiocManager::install("mzR")
+# BiocManager::install("rhdf5")
+# BiocManager::install("rpx")
+# BiocManager::install("MsCoreUtils")
+# BiocManager::install("QFeatures")
+# BiocManager::install("Spectra")
+# BiocManager::install("ProtGenerics")
+# BiocManager::install("PSMatch")
+# BiocManager::install("pheatmap")
+# BiocManager::install("limma")
+# BiocManager::install("MSnID")
+# BiocManager::install("remotes")
+# BiocManager::install("RforMassSpectrometry/SpectraVis")
+# BiocManager::install("Biostrings")
 
 #   ### 2. 🧱 PSM Object Creation & Preprocessing  
 #   **Goal:** Generate a PSM (Peptide-Spectrum Match) object from `.mzID` files  
@@ -56,8 +56,6 @@ library(Rcpp)
 
 # Access dataset using ProteomeXChange accession code
 px <- PXDataset("PXD060654")
-
-# Retrieve list of files in px
 f <-pxfiles(px)
 
 # Extract peptide-spectrum match data into object
@@ -207,59 +205,63 @@ library(vsn)
 library(MSnbase)
 library(impute)
 
-# Filter and select relevant columns from evidence data
+# Data preparation
+# Filter intensity values and select relevant columns for protein quantification
 protein_quant <- nc_evidence_filt %>%
   filter(!is.na(Intensity) & Intensity > 0) %>%
   select(Leading.razor.protein, Raw.file, Intensity)
 
-# Summarize intensities by median per protein/sample
+# Aggregate multiple intensities per protein/sample to a single median value
 protein_summary <- protein_quant %>%
   group_by(Leading.razor.protein, Raw.file) %>%
   summarize(Intensity = median(Intensity, na.rm = TRUE), .groups = "drop")
 
-# Pivot to wide format to create a protein-level intensity matrix
+# Transform data into a wide format matrix
 protein_matrix <- protein_summary %>%
   pivot_wider(names_from = Raw.file, values_from = Intensity) %>%
   as.data.frame()
 
-# Set protein IDs as rownames
+# Set protein IDs as row names
 rownames(protein_matrix) <- protein_matrix$Leading.razor.protein
 
-# Convert matrix to data frame with unique identifiers
+# Move row names into a column
 protein_df <- protein_matrix %>%
   rownames_to_column(var = "name")
 
-# Create unique identifiers if not present
+# Generate unique names to avoid duplication
 protein_df$ID <- make.unique(protein_df$name)
 protein_df$name_uniq <- paste0(protein_df$name, "_", protein_df$ID)
 
-# Identify sample columns (exclude metadata/ID columns)
+# Isolate sample intensity columns
 id_cols <- c("name", "name_uniq", "ID", "Leading.razor.protein")
 sample_cols <- setdiff(colnames(protein_df), id_cols)
 sample_names <- sample_cols
 
-# Create sample annotation (adjust if needed)
+# Setup of metadata
+# Define sample conditions and replicates
 sample_annotation <- data.frame(
   label = sample_names,
   condition = c("flg", "flg", "flg", "flg", "mock", "mock", "mock", "mock"),
   replicate = c(1, 2, 3, 4, 1, 2, 3, 4)
 )
 
-# Prepare the expression matrix
+# Create SummarizedExperiment
+# Extract the expression matrix and assign protein names as row names
 exprs_mat <- as.matrix(protein_df[, sample_cols])
 rownames(exprs_mat) <- protein_df$name
 
-# Create metadata for proteins (rowData)
+# Creates row-level metadata (protein IDs)
 rowData <- data.frame(Protein_ID = rownames(exprs_mat))
 
-# Create the SummarizedExperiment object
+# Combine expression data, sample metadata, and protein metadata
 se <- SummarizedExperiment(
   assays = list(counts = exprs_mat),
   rowData = rowData,
   colData = sample_annotation
 )
 
-# Normalize using Variance Stabilizing Normalization (VSN)
+# Normalization and imputation
+# Apply VSN to stabilize variance across expression levels
 vsn_fit <- vsn2(assay(se, "counts"))
 exprs_norm <- predict(vsn_fit, assay(se, "counts"))
 
@@ -267,7 +269,7 @@ exprs_norm <- predict(vsn_fit, assay(se, "counts"))
 assay(se, "vsn") <- exprs_norm
 se_norm <- se
 
-# Convert matrix to MSnSet
+# Wrap normalized data in MSnSet for compatibility with imputation
 msnset <- MSnSet(
   exprs = exprs_norm,
   phenoData = AnnotatedDataFrame(sample_annotation)
@@ -386,26 +388,99 @@ pheatmap(heatmap_mat_scaled,
 # write.csv(results, "limma_all_proteins.csv")
 # write.csv(sig_proteins, "limma_significant_proteins.csv")
 
-#   ### 9. 📖 Comparison with Published Results  
-#   **Goal:** Benchmark your findings  
-# ↓  
-# Create a comparison table including:
-#   - Number of spectra identified
-# - Number of peptides and proteins
-# - Key figures or results (if available)
-# - Comments on reproducibility
+# Only 11 significantly different protein when performing the statistical analysis ourselves
+# Filter and visualize normalized and imputed LFQ intensisities in proteinGroups.txt output file
 
-#   ### 10. 📝 Final Report & Interpretation  
-#   **Goal:** Reflect on your analysis  
-# ↓  
-# Submit the following:
-#   - Source code (R script or RMarkdown) in your team folder
-# - A 1–2 page report that includes:
-#   - Background of the dataset and study
-# - Summary table of key results
-# - Discussion:
-#   > Why do your results match or differ from the original publication?
-#   
-#   ---
-#   
-#   ✅ **Tip:** Convert your `.Rmd` into a clean `README.md` using `knitr::knit("README.Rmd")`.
+names(proteinGroups_data)
+
+# Remove decoys
+maxquant_fil <- proteinGroups_data %>% filter(is.na(Reverse) | Reverse == "")
+
+# Remove rows where protein IDs match contaminant
+nc_maxquant_fil <- maxquant_fil[!(maxquant_fil$Majority.protein.IDs %in% cont_prot), ]
+
+# Calculate number of unique peptides
+sum(nc_maxquant_fil$Unique.peptides)
+
+# Calculate number of razor.uniqu.peptides
+sum(nc_maxquant_fil$Razor...unique.peptides)
+
+# Generate table of number of protein grouped together due to similar peptide sequence
+table(nc_maxquant_fil$Number.of.proteins)
+
+# Plot score distribution in density plot
+ggplot(nc_maxquant_fil, aes(x = `Score`)) +
+  geom_density(fill = "lightblue") +
+  labs(title = " Score Distribution")+
+  geom_vline(xintercept = 10, 
+             color = "red", linetype = "dashed", size = 0.5)
+
+
+# Filter based on score >10 and Q value < 0.01
+high_conf_maxquant <- subset(nc_maxquant_fil, ((`Q.value` < 0.01) & (`Score`>10)))
+
+# Save original filtered dataset for comparison
+high_conf_maxquant1 <- nc_maxquant_fil
+
+# Extract LFQ intinsity data
+lfq_cols <- grep("^LFQ\\.intensity\\.", names(high_conf_maxquant), value = TRUE)
+exprs <- high_conf_maxquant[, lfq_cols]
+rownames(exprs) <- high_conf_maxquant$Majority.protein.IDs
+
+# Convert to numeric and log2 transform
+enrichment <- exprs[, "LFQ.intensity.flg"] / exprs[, "LFQ.intensity.mock"]
+log2FC <- log2(as.matrix(enrichment))
+
+# Create a dataframe containing protein names, gene names and corresponding log2 FC
+deg_results <- data.frame(
+  Protein_names = high_conf_maxquant$Protein.names,
+  Gene_names = high_conf_maxquant$Gene.names,
+  log2FC = log2FC
+)
+# Sort by log2FC in descending order
+order_results <- deg_results[order(deg_results$log2FC, decreasing = TRUE), ]
+head(order_results)
+
+# Without filtering
+lfq_cols1 <- grep("^LFQ\\.intensity\\.", names(high_conf_maxquant1), value = TRUE)
+exprs1 <- high_conf_maxquant1[, lfq_cols1]
+rownames(exprs1) <- high_conf_maxquant1$Protein.IDs
+
+enrichment1 <- exprs1[, "LFQ.intensity.flg"] / exprs1[, "LFQ.intensity.mock"]
+
+log2FC1 <-   log2(as.matrix(enrichment1))
+
+deg_results1 <- data.frame(
+  Protein_names = high_conf_maxquant1$Protein.names,
+  Gene_names = high_conf_maxquant1$Gene.names,
+  log2FC = log2FC1
+)
+
+order_results1 <- deg_results1[order(deg_results$log2FC, decreasing = TRUE), ]
+head(order_results1)
+
+# Extract top 30 proteins from filtered dataset (score and Q value)
+top30 <- deg_results %>%  slice_max(log2FC, n = 30)
+
+# Plot as dot plot
+ggplot(top30, aes(x = log2FC, y = reorder(Gene_names, log2FC))) +
+  geom_point(size = 3, color = "darkblue") +
+  theme_minimal() +
+  labs(title = "Top 30 Proteins by Log2 Fold Change",
+       x = "Log2 Fold Change (FLG vs MOCK)",
+       y = "Gene Name") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray")
+
+
+# Extract top 30 proteins from unfiltered dataset
+top30_1 <- deg_results1 %>%  slice_max(log2FC, n = 30)
+
+# Plot as dot plot
+ggplot(top30_1, aes(x = log2FC, y = reorder(Gene_names, log2FC))) +
+  geom_point(size = 3, color = "darkblue") +
+  theme_minimal() +
+  labs(title = "Top 30 Proteins by Log2 Fold Change",
+       x = "Log2 Fold Change (FLG vs MOCK)",
+       y = "Gene Name") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray")
+
