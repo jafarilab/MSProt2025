@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="t shirt final logo.png" alt="Project Logo" width="200"/>
+  <img src="fig/t shirt final logo.png" alt="Project Logo" width="200"/>
 </p>
 <p align="center">
-  <img src="t shirt final logo - black (2).jpg" alt="Project Logo" width="200"/>
+  <img src="fig/t shirt final logo - black (2).jpg" alt="Project Logo" width="200"/>
 </p>
 
 <h1 align="center">MS-PROT 2025</h1>
