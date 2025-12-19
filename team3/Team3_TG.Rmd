@@ -248,9 +248,7 @@ razor_map <- psm %>%
   count(pepseq, accession, name = "n") %>%
   group_by(pepseq) %>%
   slice_max(order_by = n, n = 1, with_ties = FALSE) %>%  # ensure only one razor protein per peptide
-  rename(razor_protein = accession)
-
-############ Problem here because "object 'accession' not found"
+  dplyr::rename(razor_protein = accession)
 
 # Protein groups
 protein_to_peptides <- psm %>%
@@ -281,7 +279,7 @@ AIM 4: QFeatures Aggregation (Optional) Note that this step was done using a evi
 # Evidence.txt: Each row = one PSM (peptide-spectrum match), that has a column Raw.file to tell which sample it came from (long format)
 
 # Read evidence.txt
-evidence <- read.delim("./Team3_evidence.txt", stringsAsFactors = FALSE)
+evidence <- read.delim('./Team3_evidence.txt', stringsAsFactors = FALSE)
 
 # To generate a QFeatures object: transform file into one row per peptide and multiple intensity columns like this: Peptide	Intensity_M1	Intensity_F1 ... (wide format)
 evidence %>%
