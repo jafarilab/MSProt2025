@@ -3,8 +3,7 @@ author: "Team 4: Hao, Tiialotta, Oluwatosin"
 
 #For reviewers (re-running the analysis): 
 #1) Open this project folder as the working directory. 
-#2) If a renv.lock file is included, run the chunk above (it will restore package versions). 
-#3) Place any external inputs (e.g., FASTA, OmicsQ exports) under data/inputs/ (see paths below).
+#2) Place any external inputs under data/inputs/ (see paths below).
 
 #Package installations
 
