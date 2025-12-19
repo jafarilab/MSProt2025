@@ -27,7 +27,10 @@ This repository contains R scripts from every team as well as their reports. To 
 ## Team 3
 
 ## Team 4
+Done
 
 ## Team 5
+Done
 
 ## Team 6
+Done
