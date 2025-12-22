@@ -21,6 +21,7 @@ This repository contains R scripts from every team as well as their reports. To 
 # How to execute scripts
 
 ## Team 1
+Done
 
 ## Team 2
 

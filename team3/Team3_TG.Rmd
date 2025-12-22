@@ -48,9 +48,13 @@ library(DEP)
 library(VennDiagram)
 ```
 
-**For reviewers (re-running the analysis):** \
-1) Open this project folder as the working directory.\
-2) Place any external inputs in this working directory.
+**For reviewers (re-running the analysis):**
+
+\
+1) Open this project folder as the working directory.
+
+\
+2) Place any external inputs in this working directory (files from Zenodo).
 
 AIM 1: Dataset Acquisition
 
