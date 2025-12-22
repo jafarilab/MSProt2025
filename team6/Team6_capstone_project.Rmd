@@ -1,0 +1,316 @@
+#Team 6: Paula, Sadiksha**
+  
+# 🧬 Capstone Project: R-based Mass Spectrometry Proteomics Workflow
+  
+#This document provides a step-by-step guide for your capstone project on analyzing proteomics data using R.
+
+---
+  
+## 🔁 Workflow Overview
+  ### 1. 📁 Dataset Acquisition  
+  #**Input:** PRIDE PXD Identifier  
+ 
+#(*Example: `PXD0123456`, accessible via [PRIDE](https://www.ebi.ac.uk/pride/)*)
+
+#Use the `rpx` package to access metadata and download a dataset that includes `.mzID` files from a published study.
+
+
+```{r}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("rpx")
+# BiocManager::install("PSMatch")
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# install.packages("sessioninfo")
+
+```
+
+
+```{r}
+library(rpx)
+library(PSMatch)
+library(ggplot2)
+library(dplyr)
+library(sessioninfo)
+```
+
+
+```{r}
+px <- PXDataset("PXD054877")  # Create a PXDataset object for the dataset with ID "PXD056514" #female
+pxfiles(px) ## Retrieve and display a list of all files associated with the PXDataset object 'px'
+
+```
+
+```{r}
+files <- pxfiles(px) #Retrieve and display a list of all files associated with the PXDataset object 'px'
+mzid_files <- pxget(px, grep("mzid", pxfiles(px))) #Identify the .mzID files from the retrieved files
+```
+
+
+---
+  
+### 2. 🧱 PSM Object Creation & Preprocessing  
+#**Goal:** Generate a PSM (Peptide-Spectrum Match) object from `.mzID` files  
+ 
+#- Convert `.mzID` files into `PSM` objects
+# Assess:
+# Number of decoy hits
+# Score distributions
+# PSM rank
+# Apply filtering based on FDR or identification score
+
+
+
+```{r}
+psms <- PSM(mzid_files, parser = 'mzID') #Convert .mzID files into PSM objects
+```
+
+```{r}
+names(psms)
+```
+```{r}
+# PSM rank
+#    * Number of decoy hits
+#no isdecoy column
+psm_df <- tidyr::as_tibble(psms)
+psm_df
+#Converted into dataframe because it is just easier to check in environment and easier to work on for me; for exploring and visualization only. we will do filtering in actual object psms in later steps
+sum(is.na(psm_df$description)) #0 #one way is to check if there are proteins without description. -> No NAs in description
+#Another idea we discussed was that if the peak score is low (for eg 0), they could be removed as decoy. So I will come back to that in later step after score distribution
+```
+
+
+```{r}
+#    * Number of decoy hits
+#no isdecoy column
+#Converted into tibble because it is just easier to check in environment and easier to work on for me. as  hist script :) 
+sum(is.na(psm_df$description)) #0 #one way is to check if there are proteins without description. -> No NAs in description
+#Another idea we discussed was that if the peak score is low (for eg 0), they could be removed as decoy. So I will come back to that in later step after score distribution
+```
+
+
+
+```{r}
+#Score distributions
+# Score distributions
+score_distribution <- summary(psms@listData$`mascot:score`)
+print(score_distribution)
+#hist(psms@listData$`mascot:score`, breaks = 100) #one way to do histogram
+
+table(psm_df$passthreshold) #true#57251 may be after removing decoys or delta score or mascot score thereshold? 
+
+ggplot(psm_df, aes(x = mascot.score)) +
+  geom_density()+
+   labs(title = "Density Plot of Mascot Scores",
+       x = "Mascot Score",
+       y = "Density") +
+  theme_minimal() 
+```
+```{r}
+
+#when filtering one plan is to remove everything at 0. just exploring where to filter
+ggplot(psm_df, aes(x = mascot.score)) +
+  geom_density(fill = "blue", alpha = 0.5) +  # Fill color for the density plot
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +  # Vertical line at x = 1
+  labs(title = "Density Plot of Mascot Scores",
+       x = "Mascot Score",
+       y = "Density") +
+  theme_minimal() 
+```
+
+
+
+
+
+```{r}
+# PSM rank
+psm_rank_distribution <- table(psm_df$rank)
+print(psm_rank_distribution) #we dont have many that have higher rank
+```
+
+```{r}
+#Apply filtering based on FDR or identification score ?
+psms <- psms %>% filterPsmRank() #keeping only those with rank 1 
+psms <- filterPsmFdr(psms, FDR = 0.05, fdr = psmVariables(psms)["fdr"], verbose = TRUE) #if we had fdr column, we don't have that column
+psm_df <- tidyr::as_tibble(psms)
+orig_df <- nrow(psm_df)
+psm_df <- psm_df %>% filter(mascot.score > 0) #filtering based on identification score becuase we do not have decoys adn fdr in this data
+filtered_df <- nrow(psm_df)
+number_of_decoys <- orig_df -filtered_df
+(number_of_decoys) 
+```
+
+```{r}
+adjacencyMatrix(psms)
+```
+
+
+
+
+
+  
+### 3. 🧬 Protein & Peptide Identification  
+# **Goal:** Determine identified peptides and proteins  
+#Count the number of identified peptides and proteins
+#Review peptide-to-protein mapping:
+#Razor proteins
+#Protein groups
+```{r}
+describePeptides(psms) #number of peptides in unfiltered dataset
+
+dim(psm_df)
+nrow(psm_df)
+length(unique(psm_df$pepseq)) 
+length(unique(psm_df$accession))
+```
+
+```{r}
+adj <- makeAdjacencyMatrix(psms) #this one is without the mascot.score <0 removed because i dont know how to convert tibble to psm again. but rank 1 is filtered. 
+dim(adj)
+```
+```{r}
+length(unique(psms$sequence))
+length(unique(psms$DatabaseAccess))
+cc <- ConnectedComponents(adj)
+length(cc)
+cc
+(i <- which(nrows(cc) > 2 & ncols(cc) > 2))
+dims(cc)[i, ]
+cx <- connectedComponents(cc, 260) #has 5 proteins, they share some peptides with another. 
+cx
+plotAdjacencyMatrix(cx)
+```
+```{r}
+(i <- which(nrows(cc) > 1 & ncols(cc) > 1))
+length(i)
+razor_prot <- as.data.frame(dims(cc[i,]))
+#Protein groups that have at least one connection to another protein and at least one peptide.
+```
+
+```{r}
+(i <- which(nrows(cc) > 1 & ncols(cc) == 1))
+length(i)
+#Protein groups that have at least one connection to another protein and at least one peptide.
+```
+
+
+```{r}
+#plotAdjacencyMatrix(cx)
+```
+
+```{r}
+cc
+```
+```{r}
+connectedComponents(cc,1)
+connectedComponents(cc,201)
+```
+```{r}
+cc_dims <- as.data.frame(dims(cc))
+colnames(cc_dims) <- c("num_of_rows", "num_of_cols")
+cc_dims <- cc_dims %>% filter(num_of_cols>1)
+```
+
+```{r}
+cc_dims <- as.data.frame(as.matrix(adj))
+cc_dims[] <- ifelse(cc_dims == 0, 0, 1)
+cc_dims$row_sum <- rowSums(cc_dims)
+cc_dims <- cc_dims %>% filter(row_sum > 1)
+cc_dims <- cc_dims %>% select(row_sum)
+```
+
+```{r}
+#Among the 1817 and the 464 proteins, we have 363 connected components. 
+
+#164 correspond to single proteins identified by single peptide. 
+#0 represent protein groups identified by a single shared peptide
+#159 represent single proteins identified by multiple unique peptides:
+#Finally, arguable those that warrant additional exploration are those that are composed of multiple peptides and multiple proteins. There are 40 thereof in this identification
+
+#which means there are 464 unique sequences.
+#there are no unique database accesses recorded in the dataset.
+#there are 363 connected components in the graph.
+#The line (i <- which(nrows(cc) > 2 & ncols(cc) > 2)) identifies the indices of connected components that have more than 2 rows and more than 2 columns.
+#The output dims(cc)[i, ] shows the dimensions (number of rows and columns) of these selected connected components
+#10 components have more than 2 rows and more than 2 columns, with varying sizes, the largest being 244 rows by 29 columns.
+```
+
+
+```{r}
+#trying to find razor proteins
+```
+
+```{r}
+sessioninfo::session_info() #versions
+```
+
+
+---
+  
+
+---
+  
+  ### 5. 🧼 Normalization & Imputation (Optional)  
+  **Goal:** Correct for technical variation and handle missing values  
+↓  
+- Normalize using `normalize()` or `normalize_vsn()`
+- Impute missing values with `impute()`
+
+---
+  
+  ### 6. 🧪 Protein Inference & Quantification (Optional)  
+  **Goal:** Summarize and quantify proteins  
+↓  
+- Aggregate peptide-level intensities into protein-level quantities
+- Optionally annotate protein IDs using external databases (e.g., UniProt)
+
+---
+  
+  ### 7. 📊 Statistical Analysis (Optional)  
+  **Goal:** Identify differentially abundant proteins  
+↓  
+- Perform statistical testing (e.g., using `test_diff()`)
+- Filter by:
+  - Log2 fold-change
+- Adjusted p-value (e.g., FDR < 0.05)
+
+---
+  
+  ### 8. 📈 Visualization & Export (Optional)  
+  **Goal:** Visualize data for interpretation  
+↓  
+- Create visual summaries:
+  - PCA plots
+- Volcano plots
+- Heatmaps  
+- Use packages such as `ggplot2`, `DEP`, or `limma`
+
+---
+  
+  ### 9. 📖 Comparison with Published Results  
+  **Goal:** Benchmark your findings  
+↓  
+Create a comparison table including:
+  - Number of spectra identified
+- Number of peptides and proteins
+- Key figures or results (if available)
+- Comments on reproducibility
+
+---
+  
+  ### 10. 📝 Final Report & Interpretation  
+  **Goal:** Reflect on your analysis  
+↓  
+Submit the following:
+  - Source code (R script or RMarkdown) in your team folder
+- A 1–2 page report that includes:
+  - Background of the dataset and study
+- Summary table of key results
+- Discussion:
+  > Why do your results match or differ from the original publication?
+  
+  ---
+  
+  ✅ **Tip:** Convert your `.Rmd` into a clean `README.md` using `knitr::knit("README.Rmd")`.
