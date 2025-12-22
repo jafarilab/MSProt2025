@@ -63,18 +63,20 @@ library(MSnbase)
 library(impute)
 library(purrr)
 
+###########For reviewers (re-running the analysis):
+  #### Open this project folder as the working directory.
+
+  #### Place any external inputs in this working directory (e.g., files from Zenodo).
+
 # Access dataset using ProteomeXChange accession code
 px <- PXDataset("PXD060654")
 f <-pxfiles(px)
 
-####### It is better to get the file like this and avoid local path which is not relevant
-####### for user on another computer
-####### pxget downloads file and saves path to it to the variable
-####### which can be used without changing the path manually
+
 path_to_file <- pxget(px , 'MS_2369_mock-vs-flg-combined_031424.mzid')
 
 # Extract peptide-spectrum match data into object
-psm <- PSMatch::PSM(path_to_file,parser='mzID')
+psm <- PSMatch::PSM(path_to_file, parser='mzID')
 
 idtbl <- as_tibble(psm)
 names(idtbl)
@@ -119,11 +121,8 @@ mltm <- dplyr::count(idtbl_filt, spectrumid) |>
 idtbl_filt2 <- idtbl_filt |> 
   filter(!spectrumid %in% mltm)
 
-# Read FASTA with contaminants from the PXD060654
-####### Cool but how can I get this file to continue with script?
-###### Either upload it somewhere and download here or upload it on GitHub
-###### and provide relevant path to it
-fasta <- readAAStringSet("team2/file63881f23791e.fasta")
+
+fasta <- readAAStringSet("./team2/Team2_uniprotkb_proteome_UP000006548_AND_revi_2025_05_22.fasta")
 
 # Extract headers
 prot_names <- names(fasta)
@@ -135,8 +134,8 @@ cont_prot<- sapply(strsplit(prot_names, "\\|"), `[`, 2)
 nc_idtbl_fil2 <- idtbl_filt2[!(idtbl_filt2$accession %in% cont_prot), ]
 
 # Count unique peptides and proteins
-length(unique(nc_idtbl_fil$pepseq)) # 21107 unique peptides
-length(unique(nc_idtbl_fil$accession)) # 3288 unique proteins
+length(unique(nc_idtbl_fil2$pepseq))
+length(unique(nc_idtbl_fil2$accession))
 
 #   ### 3. 🧬 Protein & Peptide Identification  
 #   **Goal:** Determine identified peptides and proteins  
@@ -152,9 +151,9 @@ length(unique(nc_idtbl_fil$accession)) # 3288 unique proteins
 ##### not by default, also FASTA file you used for search. All in all, please
 ##### provide all files that are need to execute MQ in the same way you did it
 ##### I don't have these paths on my local system
-evidence_path <- "team2/evidence.txt"
-proteinGroups_path <- "team2/proteinGroups.txt"
-msms_path <- "team2/msms.txt"
+evidence_path <- "C:/Users/ulavadad/Downloads/Team_2/Team2_evidence.txt"
+proteinGroups_path <- "C:/Users/ulavadad/Downloads/Team_2/Team2_proteinGroups.txt"
+msms_path <- "C:/Users/ulavadad/Downloads/Team_2/Team2_msms.txt"
 
 # Load data
 evidence_data <- read.delim(evidence_path, sep = "\t", stringsAsFactors = FALSE)
