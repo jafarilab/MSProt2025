@@ -208,8 +208,6 @@ cat("After rank + score filtering:", nrow(df_filtered_score), "PSMs retained\n")
 #TG: IMPORTANT. Note that we're applying different filters here:
 # df_filtered after rank + shared peptide filtering → 5,513 PSMs
 # df_filtered after rank + XCorr score filtering → 8,193 PSMs
-
-############ NUMBERS DON'T MATCH, DOES IT DEPEND ON THE PSMatch VERSION USED???
 ```
 
 AIM 3: Protein & Peptide Identification
