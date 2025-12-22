@@ -3,7 +3,7 @@
 # 🧬 Capstone Project: R-based Mass Spectrometry Proteomics Workflow
 
 This document provides a step-by-step guide for your capstone project on analyzing proteomics data using R.
-
+bla bla bla
 ---
 
 ## 🔁 Workflow Overview

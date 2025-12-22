@@ -12,9 +12,30 @@
  
 #(*Example: `PXD0123456`, accessible via [PRIDE](https://www.ebi.ac.uk/pride/)*)
 
-#Use the `rpx` package to access metadata and download a dataset that includes `.mzID` files from a published study.
+```{r}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("rpx")
+# BiocManager::install("PSMatch")
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# install.packages("sessioninfo")
+
+```
+
+
 ```{r}
 library(rpx)
+library(PSMatch)
+library(ggplot2)
+library(dplyr)
+library(sessioninfo)
+```
+
+
+#Use the `rpx` package to access metadata and download a dataset that includes `.mzID` files from a published study.
+```{r}
 px <- PXDataset("PXD054726")  #male
 pxfiles(px) ## Retrieve and display a list of all files associated with the PXDataset object 'px'
 
@@ -38,10 +59,7 @@ mzid_files <- pxget(px, grep("mzid", pxfiles(px))) #Identify the .mzID files fro
 # PSM rank
 # Apply filtering based on FDR or identification score
 
-```{r}
-library(PSMatch)
-library(ggplot2)
-```
+
 
 
 ```{r}
@@ -55,7 +73,6 @@ names(psms)
 # PSM rank
 #    * Number of decoy hits
 #no isdecoy column
-library("dplyr")
 psm_df <- tidyr::as_tibble(psms)
 psm_df
 #Converted into dataframe because it is just easier to check in environment and easier to work on for me. 
@@ -81,9 +98,9 @@ score_distribution <- summary(psms@listData$`mascot:score`)
 print(score_distribution)
 #hist(psms@listData$`mascot:score`, breaks = 100) #one way to do histogram
 
-table(psm_df$passthreshold) #true#76701  may be after removing decoys or delta score or mascot score thereshold? 
+table(psm_df$passthreshold) 
 
-library(ggplot2)
+
 ggplot(psm_df, aes(x = mascot.score)) +
   geom_density()+
    labs(title = "Density Plot of Mascot Scores",
@@ -104,21 +121,7 @@ ggplot(psm_df, aes(x = mascot.score)) +
 ```
 
 
-```{r}
-plot <- ggplot(psm_df, aes(x = mascot.score)) + geom_density(alpha = 0.5) +  # 
-  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +  # Vertical line at x = 1
-  labs(title = "Density Plot of Mascot Scores", x = "Mascot Score",y = "Density") +theme_minimal() 
-file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", "mascot_score_histogram.png")
-png(file, height=1000,width=1000,res=200)
-print(plot)
-dev.off()
 
-plot <- ggplot(psm_df, aes(x = mascot.score)) +geom_density()+ labs(title = "Density Plot of Mascot Scores", x = "Mascot Score",y = "Density") +theme_minimal() 
-file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", "mascot_score_histogram_no_red_line.png")
-png(file, height=1000,width=1000,res=200)
-print(plot)
-dev.off()
-```
 
 ```{r}
 # PSM rank
@@ -158,8 +161,8 @@ describePeptides(psms) #number of peptides in unfiltered dataset
 
 dim(psm_df)
 nrow(psm_df)
-length(unique(psm_df$pepseq)) #peptides #76701  after filtering
-length(unique(psm_df$accession)) #proteins? #598 number of proteins
+length(unique(psm_df$pepseq)) #peptides 
+length(unique(psm_df$accession)) #proteins? 
 ```
 
 ```{r}
@@ -186,17 +189,9 @@ length(i)
 ```{r}
 cc
 ```
-```{r}
-#file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", #"one_multiple_peptides_and_multiple_proteins_outOf_56.png")
-#png(file, height=2500,width=2500,res=200)
-#plotAdjacencyMatrix(cx)
-#dev.off()
 
-#cx <- connectedComponents(cc, 383)
-#file <- paste0("/Users/adhisadi/Library/CloudStorage/OneDrive-UniversityofHelsinki/School_work/2025-03_Proteomics/Proteomics_git_project/capestone/figures/male/", #"another_example_of_multiple_peptides_and_multiple_proteins_outOf_56.png")
-#png(file, height=2500,width=2500,res=200)
+```{r}
 #plotAdjacencyMatrix(cx)
-#dev.off()
 ```
 
 ```{r}
@@ -231,8 +226,11 @@ cc_dims <- cc_dims %>% select(row_sum)
 
 
 ```{r}
-#trying to find razor proteins
+sessioninfo::session_info() #versions
 ```
+
+
+
 
 ---
   
@@ -241,27 +239,7 @@ cc_dims <- cc_dims %>% select(row_sum)
   
 #Use `aggregateFeatures()` from the `QFeatures` package to aggregate:
   #PSMs ➡️ Peptides ➡️ Proteins
-
-library(QFeatures)
-library(dplyr)  
-qfeatures <- QFeatures(list(PSM = SummarizedExperiment(assays = list(lognorm_peptides = as.matrix(id)))))
-# Assuming 'peptide' is the column with peptide sequences and 'Mascot:score' is the scoring metric
-
-rowData(qfeatures[["PSM"]])
-qfeatures[["PSM"]]
-data("b1370p17_S9_Tot_Prot_P31_FRAX_24h_1000nM_3.RAW.-1.mgf")
-
-qfeatures <- aggregateFeatures(qfeatures,
-                               i = "PSM",  # Input assay
-                               name = "Peptides",  # Name of the new aggregated feature
-                               fcol = "peptide",  # Column containing peptide sequences
-                               fun = colMeans,  # Aggregation function (mean of scores, for example)
-                               na.rm = TRUE)
-
-library(MSnbase)
-
-
-
+  
 ---
   
   ### 5. 🧼 Normalization & Imputation (Optional)  
