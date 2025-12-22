@@ -122,7 +122,7 @@ idtbl_filt2 <- idtbl_filt |>
   filter(!spectrumid %in% mltm)
 
 
-fasta <- readAAStringSet("./team2/Team2_uniprotkb_proteome_UP000006548_AND_revi_2025_05_22.fasta")
+fasta <- readAAStringSet("./Team2_uniprotkb_proteome_UP000006548_AND_revi_2025_05_22.fasta")
 
 # Extract headers
 prot_names <- names(fasta)
@@ -151,9 +151,9 @@ length(unique(nc_idtbl_fil2$accession))
 ##### not by default, also FASTA file you used for search. All in all, please
 ##### provide all files that are need to execute MQ in the same way you did it
 ##### I don't have these paths on my local system
-evidence_path <- "C:/Users/ulavadad/Downloads/Team_2/Team2_evidence.txt"
-proteinGroups_path <- "C:/Users/ulavadad/Downloads/Team_2/Team2_proteinGroups.txt"
-msms_path <- "C:/Users/ulavadad/Downloads/Team_2/Team2_msms.txt"
+evidence_path <- "./Team2_evidence.txt"
+proteinGroups_path <- "./Team2_proteinGroups.txt"
+msms_path <- "./Team2_msms.txt"
 
 # Load data
 evidence_data <- read.delim(evidence_path, sep = "\t", stringsAsFactors = FALSE)
