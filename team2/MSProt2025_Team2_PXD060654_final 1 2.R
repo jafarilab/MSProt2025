@@ -288,6 +288,14 @@ msnset <- MSnSet(
 # Impute missing values using KNN
 msnset_imputed <- impute(msnset, method = "knn")
 
+exprs_imputed <- exprs(msnset_imputed)
+
+assay(se, "vsn_imputed") <- exprs_imputed
+se_imp_knn <- se
+
+# Now this works
+exprs_mat <- assay(se_imp_knn, "vsn_imputed")
+
 
 #   ### 6. 🧪 Protein Inference & Quantification
 #   **Goal:** Summarize and quantify proteins  
@@ -466,7 +474,7 @@ deg_results1 <- data.frame(
   log2FC = log2FC1
 )
 
-order_results1 <- deg_results1[order(deg_results$log2FC, decreasing = TRUE), ]
+order_results1 <- deg_results1[order(deg_results1$log2FC, decreasing = TRUE), ]
 head(order_results1)
 
 # Extract top 30 proteins from filtered dataset (score and Q value)
