@@ -20,10 +20,13 @@ This repository contains R scripts from every team as well as their reports. To 
 
 # How to execute scripts
 
+Please, clone this repository to your local computer. In RStudio make it as a working directory (with `setwd()`). Place all files from Zenodo repository inside this working directory.
+
 ## Team 1
-Done
+Download EncyclopeDIA `encyclopedia-4.7.11-executable.jar` executable from [repository](https://bitbucket.org/searleb/encyclopedia/downloads/) and Team1_ input files from Zenodo. Place everything in the working directory of this repository on your local computer. Then, run the script.
 
 ## Team 2
+
 
 ## Team 3
 Done
@@ -35,4 +38,4 @@ Done
 Done
 
 ## Team 6
-Done
+Just open the script and execute it. No input files are needed.
