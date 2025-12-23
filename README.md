@@ -26,7 +26,9 @@ Please, clone this repository to your local computer. In RStudio make it as a wo
 Download EncyclopeDIA `encyclopedia-4.7.11-executable.jar` executable from [repository](https://bitbucket.org/searleb/encyclopedia/downloads/) and Team1_ input files from Zenodo. Place everything in the working directory of this repository on your local computer. Then, run the script.
 
 ## Team 2
+Download Team2_ input files from Zenodo. Place everything in the working directory of this repository on your local computer. Then, run the script.
 
+If you want to run the MaxQuant in the same manner as the team did, please use `Team2_mqpar.xml` from Zenodo.
 
 ## Team 3
 Done
